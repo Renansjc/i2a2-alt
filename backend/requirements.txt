@@ -1,41 +1,30 @@
-# Framework de Agentes
-crewai
-langchain
-langchain-openai
-openai
+# Multi-Agent Framework
+crewai>=0.80.0
+crewai-tools>=0.12.0
+
+# OpenAI (required by CrewAI)
+openai>=1.0.0
+
+# Vector Database (for RAG memory)
+chromadb>=0.4.0
+sentence-transformers>=2.2.0  # For embeddings
 
 # API Framework
-fastapi
-uvicorn[standard]
-python-multipart
-pydantic
-pydantic-settings
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
 
-PyPDF2
-
-# NLP
-spacy
-transformers
-
-# Data Processing
-pandas
-numpy
-openpyxl
-
-# Database
-psycopg2-binary
-redis
-
-# HTTP Clients
-httpx
-requests
+# HTTP Client (for Supabase REST API)
+requests>=2.31.0
 
 # Utilities
-python-dateutil
-python-dotenv
-pyyaml
-jinja2
+python-dateutil>=2.8.2
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
 
 # Testing
-pytest
-pytest-asyncio
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.25.0  # For API testing

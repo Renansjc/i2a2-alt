@@ -2,15 +2,23 @@
 
 ## Overview
 
-O sistema multi-agente de IA para processamento de NF-e é uma aplicação backend construída em Python que utiliza três agentes especializados baseados em GPT-4o-mini para processar notas fiscais eletrônicas e responder perguntas dos usuários. O sistema segue uma arquitetura modular com separação clara de responsabilidades, permitindo processamento em lote de XMLs e interação conversacional através de uma API REST.
+O sistema multi-agente de IA para processamento de NF-e é uma aplicação backend construída em Python que utiliza **CrewAI** para orquestrar três agentes especializados baseados em GPT-4o-mini. Os agentes trabalham em equipe (Crew) para processar notas fiscais eletrônicas e responder perguntas dos usuários através de um chat interativo. O sistema segue uma arquitetura modular com separação clara de responsabilidades, permitindo processamento em lote de XMLs e interação conversacional através de uma API REST.
 
 ### Principais Componentes
 
 1. **API REST (FastAPI)**: Interface HTTP para comunicação com frontend
-2. **Sistema de Agentes**: Três agentes especializados que colaboram entre si
+2. **CrewAI System**: Framework de orquestração multi-agente com três agentes especializados
 3. **Processador de Lote**: Componente para importação massiva de XMLs
-4. **Sistema de Memória**: Gerenciamento de contexto conversacional
+4. **Sistema de Memória**: Gerenciamento de contexto conversacional integrado ao CrewAI
 5. **Camada de Dados**: Integração com Supabase PostgreSQL
+
+### Por que CrewAI?
+
+- **Orquestração Nativa**: CrewAI gerencia automaticamente a comunicação e delegação entre agentes
+- **Escalabilidade**: Fácil adicionar novos agentes especializados sem refatoração
+- **Processos Flexíveis**: Suporta execução sequencial e hierárquica de tarefas
+- **Memória Integrada**: Sistema de memória built-in para contexto conversacional
+- **Production-Ready**: Framework robusto e testado em ambientes empresariais
 
 ## Architecture
 
@@ -21,47 +29,47 @@ graph TB
     subgraph "Frontend"
         UI[Interface do Usuário]
     end
-    
+
     subgraph "Backend API"
         API[FastAPI REST API]
         Router[Routers]
     end
-    
+
     subgraph "Sistema de Agentes"
         Master[Agente Master<br/>Coordenador]
         SQL[Agente SQL<br/>Consultas DB]
         Conv[Agente Conversa<br/>Interação Natural]
     end
-    
+
     subgraph "Serviços"
         Batch[Processador de Lote]
         Memory[Sistema de Memória]
         DB[Cliente Supabase]
     end
-    
+
     subgraph "Externos"
         OpenAI[OpenAI API<br/>GPT-4o-mini]
         Supabase[(Supabase<br/>PostgreSQL)]
     end
-    
+
     UI -->|HTTP| API
     API --> Router
     Router -->|Chat| Master
     Router -->|Batch Upload| Batch
-    
+
     Master -->|Delega| SQL
     Master -->|Delega| Conv
     SQL -->|Consulta| DB
     Conv -->|Formata| Master
-    
+
     Master -->|Usa| Memory
     SQL -->|Usa| Memory
     Conv -->|Usa| Memory
-    
+
     Master -->|LLM Calls| OpenAI
     SQL -->|LLM Calls| OpenAI
     Conv -->|LLM Calls| OpenAI
-    
+
     Batch -->|Importa| DB
     DB -->|CRUD| Supabase
 ```
@@ -77,11 +85,11 @@ sequenceDiagram
     participant C as Agente Conversa
     participant Mem as Memória
     participant DB as Supabase
-    
+
     U->>API: POST /chat (mensagem)
     API->>Mem: Recupera histórico
     API->>M: Processa mensagem + contexto
-    
+
     alt Requer consulta SQL
         M->>S: Delega consulta
         S->>DB: Executa SQL
@@ -93,7 +101,7 @@ sequenceDiagram
         M->>C: Delega resposta
         C-->>M: Resposta natural
     end
-    
+
     M-->>API: Resposta final
     API->>Mem: Salva interação
     API-->>U: Retorna resposta
@@ -106,6 +114,7 @@ sequenceDiagram
 **Responsabilidade**: Expor endpoints HTTP para comunicação com frontend
 
 **Estrutura de Arquivos**:
+
 ```
 backend/
 ├── main.py                 # Aplicação FastAPI principal
@@ -128,7 +137,7 @@ backend/
 class ChatRequest(BaseModel):
     session_id: str
     message: str
-    
+
 class ChatResponse(BaseModel):
     session_id: str
     message: str
@@ -138,13 +147,13 @@ class ChatResponse(BaseModel):
 # POST /api/batch/upload
 class BatchUploadRequest(BaseModel):
     xml_folder: str = "xml_nf"
-    
+
 class BatchUploadResponse(BaseModel):
     total_files: int
     successful: int
     failed: int
     errors: List[Dict[str, str]]
-    
+
 # GET /api/batch/status/{job_id}
 class BatchStatusResponse(BaseModel):
     job_id: str
@@ -153,142 +162,298 @@ class BatchStatusResponse(BaseModel):
     total: int
 ```
 
-### 2. Sistema de Agentes
+### 2. Sistema de Agentes com CrewAI
 
-**Responsabilidade**: Implementar lógica de IA para processamento de requisições
+**Responsabilidade**: Implementar lógica de IA para processamento de requisições usando CrewAI
 
 **Estrutura de Arquivos**:
+
 ```
 backend/
 ├── agents/
 │   ├── __init__.py
-│   ├── base.py            # Classe base abstrata
-│   ├── master.py          # Agente Master
-│   ├── sql_agent.py       # Agente SQL
-│   ├── conversation.py    # Agente Conversa
-│   └── prompts/
+│   ├── crew.py            # Definição da Crew e orquestração
+│   ├── tools/
+│   │   ├── __init__.py
+│   │   ├── database_tool.py  # Tool para consultas SQL
+│   │   └── schema_tool.py    # Tool para informações do schema
+│   └── config/
 │       ├── __init__.py
-│       ├── master.py      # System prompts do Master
-│       ├── sql.py         # System prompts do SQL
-│       └── conversation.py # System prompts do Conversa
+│       ├── agents.yaml    # Configuração dos agentes
+│       └── tasks.yaml     # Configuração das tarefas
 ```
 
-**Interface Base**:
+**Configuração dos Agentes (agents.yaml)**:
+
+```yaml
+# agents/config/agents.yaml
+
+sql_specialist:
+  role: >
+    Especialista em Consultas SQL de Notas Fiscais
+  goal: >
+    Gerar e executar consultas SQL precisas e seguras no banco de dados PostgreSQL
+    de notas fiscais eletrônicas, retornando dados estruturados
+  backstory: >
+    Você é um especialista em SQL com profundo conhecimento do schema de notas fiscais.
+    Você sempre gera queries otimizadas, usa JOINs apropriados e limita resultados.
+    Você NUNCA executa queries de modificação (INSERT, UPDATE, DELETE), apenas SELECT.
+    Você formata valores monetários corretamente e usa agregações quando apropriado.
+
+conversation_specialist:
+  role: >
+    Especialista em Comunicação e Formatação de Respostas
+  goal: >
+    Transformar dados estruturados em respostas naturais e amigáveis,
+    mantendo conversas contextualizadas sobre notas fiscais eletrônicas
+  backstory: >
+    Você é um assistente amigável especializado em notas fiscais eletrônicas.
+    Você transforma dados técnicos em explicações claras e acessíveis.
+    Você mantém tom profissional mas acessível, usa exemplos quando apropriado,
+    e formata valores monetários em R$ com separadores de milhares.
+
+coordinator:
+  role: >
+    Coordenador de Agentes e Análise de Intenções
+  goal: >
+    Analisar mensagens dos usuários, determinar a melhor estratégia de resposta,
+    e coordenar os agentes especializados para fornecer respostas precisas
+  backstory: >
+    Você é o coordenador principal que entende as necessidades dos usuários.
+    Você decide quando consultar o banco de dados e quando fornecer respostas diretas.
+    Você mantém o contexto da conversa e garante que as respostas sejam relevantes.
+```
+
+**Configuração das Tarefas (tasks.yaml)**:
+
+```yaml
+# agents/config/tasks.yaml
+
+analyze_intent:
+  description: >
+    Analise a mensagem do usuário: "{message}"
+
+    Contexto da conversa: {chat_history}
+
+    Determine se a mensagem requer:
+    1. Consulta ao banco de dados (perguntas sobre dados específicos de NF-e)
+    2. Resposta conversacional (perguntas gerais, saudações, explicações)
+  expected_output: >
+    Uma decisão clara: "database_query" ou "conversation_only"
+    com justificativa breve
+  agent: coordinator
+
+execute_sql_query:
+  description: >
+    Execute uma consulta SQL para responder: "{message}"
+
+    Schema disponível: {database_schema}
+    Contexto: {chat_history}
+
+    Gere uma query SQL válida, execute-a e retorne os resultados estruturados.
+  expected_output: >
+    Resultados da query em formato estruturado com:
+    - Query SQL executada
+    - Dados retornados
+    - Contagem de registros
+  agent: sql_specialist
+
+format_response:
+  description: >
+    Formate a seguinte informação em uma resposta natural e amigável:
+
+    Dados: {query_results}
+    Mensagem original: "{message}"
+    Contexto: {chat_history}
+
+    Crie uma resposta conversacional que explique os dados de forma clara.
+  expected_output: >
+    Uma resposta em linguagem natural, amigável e contextualizada,
+    formatando valores monetários em R$ e explicando os dados claramente
+  agent: conversation_specialist
+
+direct_conversation:
+  description: >
+    Responda à mensagem do usuário: "{message}"
+
+    Contexto: {chat_history}
+
+    Forneça uma resposta útil e amigável sobre o sistema de notas fiscais.
+  expected_output: >
+    Uma resposta conversacional direta, profissional e amigável
+  agent: conversation_specialist
+```
+
+**Implementação da Crew (crew.py)**:
 
 ```python
-from abc import ABC, abstractmethod
+from crewai import Agent, Crew, Task, Process
+from crewai.project import CrewBase, agent, crew, task
 from typing import Dict, Any, List
+import yaml
+from pathlib import Path
 
-class BaseAgent(ABC):
-    """Classe base para todos os agentes"""
-    
-    def __init__(self, openai_client, model: str = "gpt-4o-mini"):
-        self.client = openai_client
-        self.model = model
-        self.system_prompt = self._get_system_prompt()
-    
-    @abstractmethod
-    def _get_system_prompt(self) -> str:
-        """Retorna o system prompt específico do agente"""
-        pass
-    
-    @abstractmethod
-    async def process(self, message: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Processa uma mensagem com contexto"""
-        pass
-    
-    async def _call_llm(self, messages: List[Dict[str, str]]) -> str:
-        """Chama a API da OpenAI"""
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.7
+from agents.tools.database_tool import DatabaseQueryTool
+from agents.tools.schema_tool import SchemaInfoTool
+
+@CrewBase
+class NFeCrew:
+    """Crew para processamento de consultas sobre NF-e"""
+
+    def __init__(self):
+        # Carregar configurações
+        config_path = Path(__file__).parent / "config"
+
+        with open(config_path / "agents.yaml") as f:
+            self.agents_config = yaml.safe_load(f)
+
+        with open(config_path / "tasks.yaml") as f:
+            self.tasks_config = yaml.safe_load(f)
+
+        # Inicializar tools
+        self.db_tool = DatabaseQueryTool()
+        self.schema_tool = SchemaInfoTool()
+
+    @agent
+    def sql_specialist(self) -> Agent:
+        return Agent(
+            role=self.agents_config['sql_specialist']['role'],
+            goal=self.agents_config['sql_specialist']['goal'],
+            backstory=self.agents_config['sql_specialist']['backstory'],
+            tools=[self.db_tool, self.schema_tool],
+            verbose=True,
+            allow_delegation=False
         )
-        return response.choices[0].message.content
-```
 
-**Agente Master**:
+    @agent
+    def conversation_specialist(self) -> Agent:
+        return Agent(
+            role=self.agents_config['conversation_specialist']['role'],
+            goal=self.agents_config['conversation_specialist']['goal'],
+            backstory=self.agents_config['conversation_specialist']['backstory'],
+            verbose=True,
+            allow_delegation=False
+        )
 
-```python
-class MasterAgent(BaseAgent):
-    """Agente coordenador que gerencia outros agentes"""
-    
-    def __init__(self, openai_client, sql_agent, conversation_agent):
-        super().__init__(openai_client)
-        self.sql_agent = sql_agent
-        self.conversation_agent = conversation_agent
-    
-    def _get_system_prompt(self) -> str:
-        return """Você é o Agente Master, responsável por coordenar outros agentes especializados.
-        
-        Suas responsabilidades:
-        1. Analisar a intenção da mensagem do usuário
-        2. Decidir qual agente deve processar a requisição
-        3. Delegar tarefas aos agentes especializados
-        4. Consolidar respostas e retornar ao usuário
-        
-        Agentes disponíveis:
-        - SQL Agent: Para consultas ao banco de dados de notas fiscais
-        - Conversation Agent: Para respostas conversacionais e formatação
-        
-        Sempre mantenha o contexto da conversa e seja eficiente nas delegações."""
-    
-    async def process(self, message: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        # Analisa intenção
-        intent = await self._analyze_intent(message, context)
-        
-        # Delega para agente apropriado
-        if intent["requires_database"]:
-            sql_result = await self.sql_agent.process(message, context)
-            response = await self.conversation_agent.format_response(sql_result, context)
-            agent_used = "sql"
-        else:
-            response = await self.conversation_agent.process(message, context)
-            agent_used = "conversation"
-        
-        return {
-            "response": response,
-            "agent_used": agent_used,
-            "intent": intent
+    @agent
+    def coordinator(self) -> Agent:
+        return Agent(
+            role=self.agents_config['coordinator']['role'],
+            goal=self.agents_config['coordinator']['goal'],
+            backstory=self.agents_config['coordinator']['backstory'],
+            verbose=True,
+            allow_delegation=True  # Pode delegar para outros agentes
+        )
+
+    @task
+    def analyze_intent_task(self) -> Task:
+        return Task(
+            description=self.tasks_config['analyze_intent']['description'],
+            expected_output=self.tasks_config['analyze_intent']['expected_output'],
+            agent=self.coordinator()
+        )
+
+    @task
+    def execute_sql_task(self) -> Task:
+        return Task(
+            description=self.tasks_config['execute_sql_query']['description'],
+            expected_output=self.tasks_config['execute_sql_query']['expected_output'],
+            agent=self.sql_specialist()
+        )
+
+    @task
+    def format_response_task(self) -> Task:
+        return Task(
+            description=self.tasks_config['format_response']['description'],
+            expected_output=self.tasks_config['format_response']['expected_output'],
+            agent=self.conversation_specialist()
+        )
+
+    @task
+    def direct_conversation_task(self) -> Task:
+        return Task(
+            description=self.tasks_config['direct_conversation']['description'],
+            expected_output=self.tasks_config['direct_conversation']['expected_output'],
+            agent=self.conversation_specialist()
+        )
+
+    @crew
+    def crew(self) -> Crew:
+        """Cria a crew com processo hierárquico"""
+        return Crew(
+            agents=[self.coordinator(), self.sql_specialist(), self.conversation_specialist()],
+            tasks=[],  # Tasks são adicionadas dinamicamente
+            process=Process.hierarchical,  # Coordinator gerencia automaticamente
+            manager_agent=self.coordinator(),
+            verbose=True,
+            memory=True  # Habilita memória de contexto
+        )
+
+    def process_message(self, message: str, chat_history: List[Dict] = None) -> str:
+        """Processa uma mensagem do usuário"""
+        inputs = {
+            "message": message,
+            "chat_history": chat_history or [],
+            "database_schema": self.schema_tool.get_schema()
         }
+
+        # Kickoff da crew com inputs
+        result = self.crew().kickoff(inputs=inputs)
+        return result
 ```
 
-**Agente SQL**:
+**CrewAI Tools**:
 
 ```python
-class SQLAgent(BaseAgent):
-    """Agente especializado em consultas SQL"""
-    
-    def __init__(self, openai_client, db_client, schema_info: str):
-        super().__init__(openai_client)
-        self.db = db_client
-        self.schema = schema_info
-    
-    def _get_system_prompt(self) -> str:
-        return f"""Você é um especialista em SQL para banco de dados PostgreSQL de notas fiscais eletrônicas.
-        
-        Schema do banco de dados:
-        {self.schema}
-        
-        Suas responsabilidades:
-        1. Gerar consultas SQL válidas e seguras baseadas em requisições em linguagem natural
-        2. Executar as consultas no banco de dados
-        3. Retornar resultados estruturados
-        
-        Regras importantes:
-        - Use APENAS SELECT queries (nunca INSERT, UPDATE, DELETE)
-        - Sempre use JOINs apropriados para relacionamentos
-        - Limite resultados a 100 registros por padrão
-        - Use agregações quando apropriado
-        - Formate valores monetários corretamente"""
-    
-    async def process(self, message: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        # Gera SQL
-        sql_query = await self._generate_sql(message, context)
-        
-        # Executa query
+# agents/tools/database_tool.py
+from crewai_tools import BaseTool
+from typing import Type
+from pydantic import BaseModel, Field
+import psycopg2
+from config import settings
+
+class DatabaseQueryInput(BaseModel):
+    """Input para DatabaseQueryTool"""
+    sql_query: str = Field(..., description="Query SQL SELECT para executar")
+
+class DatabaseQueryTool(BaseTool):
+    name: str = "Database Query Tool"
+    description: str = (
+        "Executa queries SQL SELECT no banco de dados PostgreSQL de notas fiscais. "
+        "Use esta tool para buscar dados de NF-e. "
+        "IMPORTANTE: Apenas queries SELECT são permitidas."
+    )
+    args_schema: Type[BaseModel] = DatabaseQueryInput
+
+    def _run(self, sql_query: str) -> dict:
+        """Executa query SQL e retorna resultados"""
+        # Validar que é apenas SELECT
+        if not sql_query.strip().upper().startswith('SELECT'):
+            return {
+                "success": False,
+                "error": "Apenas queries SELECT são permitidas"
+            }
+
         try:
-            results = await self.db.execute_query(sql_query)
+            conn = psycopg2.connect(
+                host=settings.supabase_url.replace('https://', '').split('.')[0],
+                database="postgres",
+                user="postgres",
+                password=settings.supabase_service_key
+            )
+
+            cursor = conn.cursor()
+            cursor.execute(sql_query)
+
+            # Buscar resultados
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+
+            cursor.close()
+            conn.close()
+
             return {
                 "success": True,
                 "query": sql_query,
@@ -301,53 +466,79 @@ class SQLAgent(BaseAgent):
                 "error": str(e),
                 "query": sql_query
             }
+
+# agents/tools/schema_tool.py
+class SchemaInfoInput(BaseModel):
+    """Input para SchemaInfoTool"""
+    table_name: str = Field(default="all", description="Nome da tabela ou 'all' para todas")
+
+class SchemaInfoTool(BaseTool):
+    name: str = "Schema Info Tool"
+    description: str = (
+        "Retorna informações sobre o schema do banco de dados de notas fiscais. "
+        "Use para entender quais tabelas e colunas estão disponíveis."
+    )
+    args_schema: Type[BaseModel] = SchemaInfoInput
+
+    def _run(self, table_name: str = "all") -> str:
+        """Retorna informações do schema"""
+        schema_info = """
+        Schema do Banco de Dados de Notas Fiscais Eletrônicas:
+
+        Tabelas principais:
+
+        1. empresas
+           - id, cnpj, razao_social, nome_fantasia, inscricao_estadual
+           - logradouro, numero, complemento, bairro, municipio, uf, cep
+           - telefone, email
+
+        2. notas_fiscais
+           - id, chave_acesso, numero, serie, data_emissao, data_saida
+           - emitente_id (FK empresas), destinatario_id (FK empresas)
+           - valor_total, valor_produtos, valor_frete, valor_seguro, valor_desconto
+           - valor_icms, valor_ipi, valor_pis, valor_cofins
+           - natureza_operacao, tipo_operacao, finalidade
+
+        3. nf_itens
+           - id, nota_fiscal_id (FK notas_fiscais)
+           - numero_item, codigo_produto, descricao, ncm, cfop, unidade
+           - quantidade, valor_unitario, valor_total, valor_desconto
+
+        4. nf_itens_icms, nf_itens_ipi, nf_itens_pis, nf_itens_cofins
+           - Impostos detalhados por item
+
+        5. nf_pagamentos
+           - id, nota_fiscal_id (FK notas_fiscais)
+           - forma_pagamento, valor_pagamento
+
+        6. nf_transporte
+           - id, nota_fiscal_id (FK notas_fiscais)
+           - modalidade_frete, transportadora_id (FK empresas)
+           - placa_veiculo, uf_veiculo
+        """
+
+        return schema_info
+
+    def get_schema(self) -> str:
+        """Método auxiliar para obter schema completo"""
+        return self._run("all")
 ```
 
-**Agente Conversa**:
+**Vantagens da Abordagem CrewAI**:
 
-```python
-class ConversationAgent(BaseAgent):
-    """Agente especializado em interação natural"""
-    
-    def _get_system_prompt(self) -> str:
-        return """Você é um assistente amigável especializado em notas fiscais eletrônicas.
-        
-        Suas responsabilidades:
-        1. Responder perguntas gerais sobre o sistema
-        2. Formatar dados de consultas SQL em linguagem natural
-        3. Manter conversas contextualizadas e amigáveis
-        4. Explicar conceitos fiscais quando necessário
-        
-        Estilo de comunicação:
-        - Profissional mas acessível
-        - Claro e objetivo
-        - Use exemplos quando apropriado
-        - Formate valores monetários em R$ com separadores"""
-    
-    async def process(self, message: str, context: Dict[str, Any]) -> str:
-        messages = self._build_messages(message, context)
-        return await self._call_llm(messages)
-    
-    async def format_response(self, data: Dict[str, Any], context: Dict[str, Any]) -> str:
-        """Formata dados estruturados em resposta natural"""
-        prompt = f"""Formate os seguintes dados em uma resposta natural e amigável:
-        
-        Dados: {json.dumps(data, ensure_ascii=False, indent=2)}
-        
-        Contexto da conversa: {context.get('history', [])}"""
-        
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": prompt}
-        ]
-        return await self._call_llm(messages)
-```
+1. **Delegação Automática**: O agente coordinator (manager) delega automaticamente tarefas
+2. **Memória Integrada**: CrewAI gerencia contexto conversacional nativamente
+3. **Tools Reutilizáveis**: DatabaseQueryTool e SchemaInfoTool podem ser usados por qualquer agente
+4. **Processo Hierárquico**: Coordinator age como manager, decidindo qual agente usar
+5. **Configuração Declarativa**: Agentes e tarefas definidos em YAML, fácil de manter
+6. **Escalável**: Adicionar novos agentes é simples - apenas criar novo agent e tasks
 
 ### 3. Sistema de Memória
 
 **Responsabilidade**: Gerenciar contexto conversacional
 
 **Estrutura**:
+
 ```
 backend/
 ├── memory/
@@ -370,50 +561,50 @@ class ChatMessage(BaseModel):
 
 class ChatMemory:
     """Gerencia histórico de conversação"""
-    
+
     def __init__(self, max_messages: int = 4):  # 2 interações = 4 mensagens
         self.max_messages = max_messages
         self.sessions: Dict[str, List[ChatMessage]] = {}
-    
+
     def add_message(self, session_id: str, role: str, content: str, metadata: Dict = None):
         """Adiciona mensagem ao histórico"""
         if session_id not in self.sessions:
             self.sessions[session_id] = []
-        
+
         message = ChatMessage(
             role=role,
             content=content,
             timestamp=datetime.now(),
             metadata=metadata or {}
         )
-        
+
         self.sessions[session_id].append(message)
-        
+
         # Mantém apenas últimas N mensagens
         if len(self.sessions[session_id]) > self.max_messages:
             self.sessions[session_id] = self.sessions[session_id][-self.max_messages:]
-    
+
     def get_history(self, session_id: str) -> List[Dict[str, str]]:
         """Retorna histórico formatado para OpenAI"""
         if session_id not in self.sessions:
             return []
-        
+
         return [
             {"role": msg.role, "content": msg.content}
             for msg in self.sessions[session_id]
         ]
-    
+
     def get_context_summary(self, session_id: str) -> str:
         """Retorna resumo do contexto"""
         history = self.get_history(session_id)
         if not history:
             return "Nenhum histórico disponível"
-        
+
         return "\n".join([
             f"{msg['role']}: {msg['content'][:100]}..."
             for msg in history
         ])
-    
+
     def clear_session(self, session_id: str):
         """Limpa histórico de uma sessão"""
         if session_id in self.sessions:
@@ -425,6 +616,7 @@ class ChatMemory:
 **Responsabilidade**: Processar múltiplos XMLs em lote
 
 **Estrutura**:
+
 ```
 backend/
 ├── batch/
@@ -442,15 +634,15 @@ from pathlib import Path
 
 class BatchProcessor:
     """Processa múltiplos XMLs em lote"""
-    
+
     def __init__(self, importer):
         self.importer = importer  # SupabaseNFeImporter do db.py
         self.jobs: Dict[str, Dict] = {}
-    
+
     async def process_folder(self, folder_path: str, job_id: str) -> Dict[str, Any]:
         """Processa todos os XMLs de uma pasta"""
         xml_files = list(Path(folder_path).glob("*.xml"))
-        
+
         self.jobs[job_id] = {
             "status": "running",
             "total": len(xml_files),
@@ -459,7 +651,7 @@ class BatchProcessor:
             "failed": 0,
             "errors": []
         }
-        
+
         for xml_file in xml_files:
             try:
                 await asyncio.to_thread(
@@ -475,10 +667,10 @@ class BatchProcessor:
                 })
             finally:
                 self.jobs[job_id]["processed"] += 1
-        
+
         self.jobs[job_id]["status"] = "completed"
         return self.jobs[job_id]
-    
+
     def get_job_status(self, job_id: str) -> Optional[Dict]:
         """Retorna status de um job"""
         return self.jobs.get(job_id)
@@ -489,6 +681,7 @@ class BatchProcessor:
 **Responsabilidade**: Abstração para operações no banco de dados
 
 **Estrutura**:
+
 ```
 backend/
 ├── database/
@@ -505,7 +698,7 @@ from typing import List, Dict, Any
 
 class SupabaseClient:
     """Cliente para operações no Supabase"""
-    
+
     def __init__(self, url: str, service_key: str):
         self.base_url = f"{url}/rest/v1"
         self.headers = {
@@ -513,24 +706,24 @@ class SupabaseClient:
             "Authorization": f"Bearer {service_key}",
             "Content-Type": "application/json"
         }
-    
+
     async def execute_query(self, sql: str) -> List[Dict[str, Any]]:
         """Executa query SQL via RPC"""
         # Nota: Supabase não expõe SQL direto via REST
         # Precisamos usar stored procedures ou construir queries via REST API
         # Esta é uma simplificação - implementação real usaria psycopg2
         pass
-    
-    async def query_table(self, table: str, filters: Dict = None, 
+
+    async def query_table(self, table: str, filters: Dict = None,
                          select: str = "*", limit: int = 100) -> List[Dict]:
         """Query usando REST API do Supabase"""
         url = f"{self.base_url}/{table}"
         params = {"select": select, "limit": limit}
-        
+
         if filters:
             for key, value in filters.items():
                 params[key] = f"eq.{value}"
-        
+
         response = requests.get(url, headers=self.headers, params=params)
         response.raise_for_status()
         return response.json()
@@ -603,7 +796,7 @@ class ErrorCode(Enum):
 
 class AppException(Exception):
     """Exceção base da aplicação"""
-    
+
     def __init__(self, code: ErrorCode, message: str, details: Optional[Dict] = None):
         self.code = code
         self.message = message
@@ -631,7 +824,7 @@ import json
 class StructuredLogger:
     def __init__(self, name: str):
         self.logger = logging.getLogger(name)
-    
+
     def log_event(self, level: str, event: str, **kwargs):
         log_data = {
             "event": event,
@@ -672,17 +865,20 @@ backend/
 ### Estratégia de Testes
 
 **Testes Unitários**:
+
 - Testar cada agente isoladamente com mocks da OpenAI
 - Testar sistema de memória
 - Testar parsing de XML
 - Testar geração de SQL
 
 **Testes de Integração**:
+
 - Testar fluxo completo de chat
 - Testar processamento de lote
 - Testar integração com Supabase (usando banco de teste)
 
 **Mocks e Fixtures**:
+
 ```python
 # conftest.py
 import pytest
@@ -747,20 +943,20 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str
     openai_model: str = "gpt-4o-mini"
-    
+
     # Supabase
     supabase_url: str
     supabase_service_key: str
-    
+
     # App
     app_env: str = "development"
     log_level: str = "INFO"
     max_chat_history: int = 4
-    
+
     # Batch
     xml_folder: str = "xml_nf"
     max_concurrent_uploads: int = 5
-    
+
     class Config:
         env_file = ".env"
 
@@ -802,11 +998,15 @@ backend/
 └── tests/
 ```
 
-### Dependências Atualizadas
+### Dependências Atualizadas com CrewAI
 
 ```txt
 # requirements.txt
-# OpenAI
+# Multi-Agent Framework
+crewai>=0.80.0
+crewai-tools>=0.12.0
+
+# OpenAI (required by CrewAI)
 openai>=1.0.0
 
 # API Framework
@@ -831,27 +1031,27 @@ pytest-asyncio
 httpx  # Para testes de API
 ```
 
-### Inicialização da Aplicação
+### Inicialização da Aplicação com CrewAI
 
 ```python
 # main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+import os
 
 from config import settings
 from api.routes import chat, batch
-from agents.master import MasterAgent
-from agents.sql_agent import SQLAgent
-from agents.conversation import ConversationAgent
+from agents.crew import NFeCrew
 from memory.chat_memory import ChatMemory
-from database.client import SupabaseClient
-from database.schema import get_schema_info
-from openai import AsyncOpenAI
 
 # Configurar logging
 logging.basicConfig(level=settings.log_level)
 logger = logging.getLogger(__name__)
+
+# Configurar variáveis de ambiente para CrewAI
+os.environ["OPENAI_API_KEY"] = settings.openai_api_key
+os.environ["OPENAI_MODEL_NAME"] = settings.openai_model
 
 # Inicializar aplicação
 app = FastAPI(title="Multi-Agent NF-e System", version="1.0.0")
@@ -859,7 +1059,7 @@ app = FastAPI(title="Multi-Agent NF-e System", version="1.0.0")
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -868,37 +1068,16 @@ app.add_middleware(
 # Inicializar componentes
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Inicializando sistema...")
-    
-    # OpenAI client
-    app.state.openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
-    
-    # Database client
-    app.state.db_client = SupabaseClient(
-        settings.supabase_url,
-        settings.supabase_service_key
-    )
-    
-    # Schema info
-    schema_info = get_schema_info()
-    
-    # Agentes
-    app.state.sql_agent = SQLAgent(
-        app.state.openai_client,
-        app.state.db_client,
-        schema_info
-    )
-    app.state.conversation_agent = ConversationAgent(app.state.openai_client)
-    app.state.master_agent = MasterAgent(
-        app.state.openai_client,
-        app.state.sql_agent,
-        app.state.conversation_agent
-    )
-    
-    # Memória
+    logger.info("Inicializando sistema com CrewAI...")
+
+    # Inicializar NFe Crew
+    app.state.nfe_crew = NFeCrew()
+
+    # Memória de chat (para histórico entre sessões)
     app.state.memory = ChatMemory(max_messages=settings.max_chat_history)
-    
+
     logger.info("Sistema inicializado com sucesso!")
+    logger.info(f"Agentes disponíveis: Coordinator, SQL Specialist, Conversation Specialist")
 
 # Incluir routers
 app.include_router(chat.router, prefix="/api", tags=["chat"])
@@ -906,11 +1085,57 @@ app.include_router(batch.router, prefix="/api", tags=["batch"])
 
 @app.get("/")
 async def root():
-    return {"message": "Multi-Agent NF-e System API", "version": "1.0.0"}
+    return {
+        "message": "Multi-Agent NF-e System API",
+        "version": "1.0.0",
+        "framework": "CrewAI",
+        "agents": ["Coordinator", "SQL Specialist", "Conversation Specialist"]
+    }
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    return {"status": "healthy", "framework": "CrewAI"}
+```
+
+**Exemplo de uso da Crew no endpoint de chat**:
+
+```python
+# api/routes/chat.py
+from fastapi import APIRouter, HTTPException, Request
+from api.models.requests import ChatRequest
+from api.models.responses import ChatResponse
+from datetime import datetime
+
+router = APIRouter()
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest, app_request: Request):
+    """Processa mensagem do usuário através da CrewAI"""
+    try:
+        # Recuperar histórico da memória
+        memory = app_request.app.state.memory
+        chat_history = memory.get_history(request.session_id)
+
+        # Processar mensagem através da Crew
+        nfe_crew = app_request.app.state.nfe_crew
+        response_text = nfe_crew.process_message(
+            message=request.message,
+            chat_history=chat_history
+        )
+
+        # Salvar interação na memória
+        memory.add_message(request.session_id, "user", request.message)
+        memory.add_message(request.session_id, "assistant", response_text)
+
+        return ChatResponse(
+            session_id=request.session_id,
+            message=response_text,
+            agent_used="crewai_hierarchical",
+            timestamp=datetime.now()
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 ```
 
 ## Performance Considerations
