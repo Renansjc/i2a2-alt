@@ -1,0 +1,41 @@
+# Framework de Agentes
+crewai
+langchain
+langchain-openai
+openai
+
+# API Framework
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+pydantic-settings
+
+PyPDF2
+
+# NLP
+spacy
+transformers
+
+# Data Processing
+pandas
+numpy
+openpyxl
+
+# Database
+psycopg2-binary
+redis
+
+# HTTP Clients
+httpx
+requests
+
+# Utilities
+python-dateutil
+python-dotenv
+pyyaml
+jinja2
+
+# Testing
+pytest
+pytest-asyncio
