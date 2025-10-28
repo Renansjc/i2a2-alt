@@ -99,8 +99,8 @@ class NFeCrew:
             ],
             verbose=True,
             allow_delegation=False,  # SQL specialist doesn't delegate
-            max_iter=15,  # Allow multiple iterations for complex queries
-            memory=True  # Enable memory for context
+            max_iter=7,  # REDUZIDO: Evita loops (era 15)
+            memory=False  # DESABILITADO: Memory muito lenta
         )
     
     @agent
@@ -124,8 +124,8 @@ class NFeCrew:
             tools=[],  # No tools - only formats responses
             verbose=True,
             allow_delegation=False,  # Conversation specialist doesn't delegate
-            max_iter=10,
-            memory=True  # Enable memory for context
+            max_iter=3,  # REDUZIDO: Evita loops (era 10)
+            memory=False  # DESABILITADO: Memory muito lenta
         )
     
     @agent
@@ -152,8 +152,8 @@ class NFeCrew:
             ],  # Coordinator has all tools available
             verbose=True,
             allow_delegation=True,  # Can delegate to other agents
-            max_iter=25,  # Allow more iterations
-            memory=True  # Enable memory for context
+            max_iter=5,  # REDUZIDO: Evita loops infinitos (era 25)
+            memory=False  # DESABILITADO: Memory muito lenta
         )
     
     @task
@@ -321,20 +321,21 @@ class NFeCrew:
             ],
             "process": Process.sequential,  # Sequential execution
             "verbose": True,  # Enable detailed logging
-            "memory": True,  # Enable memory for conversation context
+            "memory": False,  # DESABILITADO: Entity Memory muito lenta (10s+ por save)
         }
         
+        # DESABILITADO: Embedder não necessário com memory=False
         # Add embedder configuration for semantic memory
-        if settings.enable_semantic_search and settings.openai_api_key:
-            import os
-            os.environ["CHROMA_OPENAI_API_KEY"] = settings.openai_api_key
-            
-            crew_config["embedder"] = {
-                "provider": "openai",
-                "config": {
-                    "model": "text-embedding-3-small"
-                }
-            }
+        # if settings.enable_semantic_search and settings.openai_api_key:
+        #     import os
+        #     os.environ["CHROMA_OPENAI_API_KEY"] = settings.openai_api_key
+        #     
+        #     crew_config["embedder"] = {
+        #         "provider": "openai",
+        #         "config": {
+        #             "model": "text-embedding-3-small"
+        #         }
+        #     }
         
         return Crew(**crew_config)
     
@@ -414,59 +415,25 @@ class NFeCrew:
             str: Formatted schema summary
         """
         return """
-Schema do Banco de Dados de Notas Fiscais Eletrônicas:
+Schema NF-e (PostgreSQL):
 
-Tabelas Principais:
+Tabelas: empresas, notas_fiscais, nf_itens, nf_pagamentos, nf_transporte
 
-1. empresas
-   - Armazena dados de emitentes e destinatários
-   - Colunas: id, cpf_cnpj, razao_social, nome_fantasia, inscricao_estadual
-   - Endereço: logradouro, numero, complemento, bairro, municipio, uf, cep
-   - Contato: telefone, email
+Colunas principais:
+- empresas: id, cpf_cnpj, razao_social, nome_fantasia
+- notas_fiscais: id, chave_acesso, numero_nf, emitente_id, destinatario_id, 
+  valor_total_nota, data_hora_emissao, status
+- nf_itens: id, nota_fiscal_id, descricao_produto, quantidade_comercial, valor_total_bruto
 
-2. notas_fiscais
-   - Dados principais das NF-e
-   - Colunas: id, chave_acesso, numero_nf, serie, data_hora_emissao, data_hora_saida
-   - Relacionamentos: emitente_id (FK empresas), destinatario_id (FK empresas)
-   - Valores: valor_total_nota, valor_total_produtos, valor_frete, valor_seguro, valor_desconto
-   - Impostos: valor_total_icms, valor_total_ipi, valor_total_pis, valor_total_cofins
-   - Outros: natureza_operacao, tipo_operacao, finalidade_emissao, status
-
-3. nf_itens
-   - Produtos/serviços das notas
-   - Colunas: id, nota_fiscal_id (FK notas_fiscais), numero_item
-   - Produto: codigo_produto, descricao_produto, ncm, cfop, unidade_comercial
-   - Valores: quantidade_comercial, valor_unitario_comercial, valor_total_bruto, valor_desconto
-
-4. nf_itens_icms, nf_itens_ipi, nf_itens_pis, nf_itens_cofins
-   - Impostos detalhados por item
-   - Relacionamento: item_id (FK nf_itens)
-   - Dados de tributação: origem, situacao_tributaria, base_calculo, aliquota, valor
-
-5. nf_pagamentos
-   - Formas de pagamento das notas
-   - Colunas: id, nota_fiscal_id (FK notas_fiscais)
-   - Dados: forma_pagamento, valor_pagamento
-
-6. nf_transporte
-   - Informações de transporte
-   - Colunas: id, nota_fiscal_id (FK notas_fiscais)
-   - Dados: modalidade_frete, transportadora_id (FK empresas)
-   - Veículo: placa_veiculo, uf_veiculo
-
-Relacionamentos Importantes:
+Relacionamentos:
 - notas_fiscais.emitente_id → empresas.id
 - notas_fiscais.destinatario_id → empresas.id
 - nf_itens.nota_fiscal_id → notas_fiscais.id
-- nf_pagamentos.nota_fiscal_id → notas_fiscais.id
-- nf_transporte.nota_fiscal_id → notas_fiscais.id
 
-Dicas para Queries:
-- Use JOINs para relacionar notas com empresas
-- Filtre por status='autorizada' para notas válidas
-- Use agregações (SUM, COUNT, AVG) para análises
-- Sempre use LIMIT para evitar retornar muitos dados
-- Formate datas com data_hora_emissao, data_hora_saida
+Regras SQL:
+1. LIMIT obrigatório (máx 100)
+2. Filtre status='autorizada'
+3. LEFT JOIN para empresas, INNER JOIN para itens
 """
 
 

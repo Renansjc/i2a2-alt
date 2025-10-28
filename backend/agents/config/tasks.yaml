@@ -1,5 +1,5 @@
 # agents/config/tasks.yaml
-# Configuração das tarefas para o sistema multi-agente de NF-e
+# Configuração OTIMIZADA das tarefas para o sistema multi-agente de NF-e
 
 analyze_intent:
   description: >
@@ -7,12 +7,16 @@ analyze_intent:
     
     Contexto da conversa: {chat_history}
     
-    Determine se a mensagem requer:
-    1. **database_query** - Consulta ao banco de dados
-    2. **conversation_only** - Resposta conversacional
+    ⚠️ PRIORIDADE: Verifique se é FOLLOW-UP antes de classificar!
     
-    REQUER DATABASE_QUERY quando pergunta sobre:
-    ✓ Valores, quantidades, totais (Ex: "quanto vendemos?", "qual o valor total?")
+    FOLLOW-UP (usa contexto, não precisa de banco):
+    ✓ Perguntas que se referem a algo já mencionado
+    ✓ Palavras-chave: "qual foi", "quanto foi", "e o/a", "aquele", "esse", "anterior"
+    ✓ Exemplos: "Qual foi o nome?", "E a empresa?", "Quanto foi mesmo?"
+    → Classificar como: **conversation_only** (usará contexto)
+    
+    DATABASE_QUERY (precisa consultar banco):
+    ✓ Valores, quantidades, totais NOVOS (Ex: "quanto vendemos?", "qual o valor total?")
     ✓ Datas específicas (Ex: "vendas de janeiro", "notas de hoje")
     ✓ Empresas/clientes (Ex: "notas da empresa X", "maiores clientes")
     ✓ Produtos (Ex: "produtos mais vendidos", "quais itens foram vendidos")
@@ -20,24 +24,27 @@ analyze_intent:
     ✓ Estatísticas (Ex: "média de vendas", "top 10 produtos")
     ✓ Comparações (Ex: "vendas este mês vs mês passado")
     
-    REQUER CONVERSATION_ONLY quando:
+    CONVERSATION_ONLY (resposta direta sem banco):
     ✓ Saudações (Ex: "olá", "bom dia", "oi")
     ✓ Agradecimentos (Ex: "obrigado", "valeu")
     ✓ Perguntas sobre o sistema (Ex: "o que você pode fazer?", "como funciona?")
     ✓ Explicações gerais (Ex: "o que é NF-e?", "como importar notas?")
     ✓ Confirmações (Ex: "ok", "entendi", "certo")
+    ✓ FOLLOW-UPS (perguntas sobre resposta anterior)
     
     EXEMPLOS:
     - "Quanto vendemos em janeiro?" → database_query
-    - "Quais são os 5 produtos mais vendidos?" → database_query
+    - "Qual foi o valor mesmo?" → conversation_only (follow-up)
+    - "Quais os 5 produtos mais vendidos?" → database_query
+    - "E o nome da empresa?" → conversation_only (follow-up)
     - "Olá, tudo bem?" → conversation_only
-    - "O que é uma nota fiscal eletrônica?" → conversation_only
   
   expected_output: >
     JSON com:
     {
       "strategy": "database_query" ou "conversation_only",
       "confidence": "high" ou "medium" ou "low",
+      "is_follow_up": true/false,
       "reasoning": "breve justificativa (1-2 frases)",
       "detected_entities": {
         "time_period": "se houver referência a período",
@@ -51,29 +58,40 @@ analyze_intent:
 
 execute_sql_query:
   description: >
+    ⚠️ ATENÇÃO: Antes de executar query, verifique se a informação JÁ está no contexto!
+    
+    Contexto disponível: {chat_history}
+    
+    Se a resposta está no contexto acima, NÃO execute query - responda usando o contexto.
+    
+    ════════════════════════════════════════════════════════════════
+    
     Execute uma consulta SQL para responder: "{message}"
     
-    Schema disponível:
-    {database_schema}
+    Schema disponível: {database_schema}
     
     Entidades detectadas: {detected_entities}
-    Contexto: {chat_history}
     
     PROCESSO OBRIGATÓRIO:
     
-    1. ANÁLISE DA PERGUNTA
+    1. VERIFICAR CONTEXTO PRIMEIRO
+       - Se a informação JÁ foi consultada, está no contexto acima
+       - NÃO execute a mesma query novamente
+       - Use o resultado anterior do contexto
+    
+    2. ANÁLISE DA PERGUNTA (se precisar de query nova)
        - Identifique o objetivo (total? lista? comparação? média?)
        - Identifique filtros (período, empresa, produto, status)
        - Identifique agregações necessárias (SUM, COUNT, AVG, etc)
     
-    2. SELEÇÃO DE TABELAS
+    3. SELEÇÃO DE TABELAS
        - notas_fiscais: para dados gerais da NF
        - empresas: para emitentes/destinatários
        - nf_itens: para produtos/serviços
        - nf_itens_icms/ipi/pis/cofins: para impostos
        - nf_pagamentos: para formas de pagamento
     
-    3. CONSTRUÇÃO DA QUERY
+    4. CONSTRUÇÃO DA QUERY
        - Use SELECT com colunas específicas (nunca SELECT *)
        - Use JOINs apropriados (INNER para obrigatório, LEFT para opcional)
        - Adicione WHERE com filtros relevantes
@@ -82,16 +100,22 @@ execute_sql_query:
        - Use ORDER BY para ordenação lógica
        - SEMPRE adicione LIMIT (máx 100)
     
-    4. VALIDAÇÃO
+    5. VALIDAÇÃO
        - Apenas SELECT permitido (nunca INSERT/UPDATE/DELETE)
        - Sintaxe PostgreSQL válida
        - Aliases descritivos nas colunas
        - Valores monetários como NUMERIC
     
-    5. FORMATAÇÃO
+    6. FORMATAÇÃO
        - Use TO_CHAR para formatar datas
        - Use ROUND para valores monetários (2 casas)
        - Use aliases legíveis (total_vendas, quantidade_produtos, etc)
+    
+    ⚠️ REGRAS ANTI-LOOP:
+    - Máximo 2 tentativas por query
+    - Se query falhar, NÃO tente exatamente igual
+    - Se falhar 2x, responda com o que conseguiu
+    - NUNCA execute a mesma query que está no contexto
     
     EXEMPLOS DE QUERIES BEM FEITAS:
     
@@ -110,31 +134,27 @@ execute_sql_query:
     Pergunta: "Top 5 produtos mais vendidos"
     ```sql
     SELECT 
-      i.descricao as produto,
+      i.descricao_produto as produto,
       SUM(i.quantidade_comercial) as quantidade_total,
       ROUND(SUM(i.valor_total_bruto)::numeric, 2) as valor_total
     FROM nf_itens i
     INNER JOIN notas_fiscais nf ON i.nota_fiscal_id = nf.id
     WHERE nf.status = 'autorizada'
-    GROUP BY i.descricao
+    GROUP BY i.descricao_produto
     ORDER BY quantidade_total DESC
     LIMIT 5;
     ```
     
-    Pergunta: "Notas da empresa ABC"
+    Pergunta: "Gere empresa aleatória"
     ```sql
     SELECT 
-      nf.numero_nf,
-      nf.serie,
-      TO_CHAR(nf.data_hora_emissao, 'DD/MM/YYYY') as data_emissao,
-      ROUND(nf.valor_total_nota::numeric, 2) as valor_total,
-      e.razao_social as emitente
-    FROM notas_fiscais nf
-    LEFT JOIN empresas e ON nf.emitente_id = e.id
-    WHERE nf.status = 'autorizada'
-      AND e.razao_social ILIKE '%ABC%'
-    ORDER BY nf.data_hora_emissao DESC
-    LIMIT 20;
+      id,
+      razao_social,
+      cpf_cnpj,
+      nome_fantasia
+    FROM empresas
+    ORDER BY RANDOM()
+    LIMIT 1;
     ```
   
   expected_output: >
@@ -152,11 +172,19 @@ execute_sql_query:
 
 format_response:
   description: >
+    ⚠️ IMPORTANTE: Verifique o contexto ANTES de formatar!
+    
+    Contexto da conversa: {chat_history}
+    
+    Se o usuário perguntou sobre algo JÁ mencionado (follow-up):
+    → Use informação do CONTEXTO, não dos dados da consulta
+    
+    ════════════════════════════════════════════════════════════════
+    
     Formate os dados em uma resposta natural e profissional:
     
     Dados da consulta: {query_results}
     Mensagem original: "{message}"
-    Contexto: {chat_history}
     
     DIRETRIZES DE FORMATAÇÃO:
     
@@ -175,7 +203,7 @@ format_response:
     3. ORGANIZAÇÃO VISUAL
        ✓ Use listas numeradas para rankings
        ✓ Use bullet points para itens não ordenados
-       ✓ Use negrito para destacar valores importantes (quando suportado)
+       ✓ Use negrito para destacar valores importantes
        ✓ Separe seções com quebras de linha
     
     4. TOM E ESTILO
@@ -208,49 +236,76 @@ format_response:
     ```
     Os 5 produtos mais vendidos em outubro foram:
     
-    1. **Produto A** - 234 unidades (R$ 45.600,00)
-    2. **Produto B** - 189 unidades (R$ 32.150,00)
-    3. **Produto C** - 156 unidades (R$ 28.900,00)
-    4. **Produto D** - 142 unidades (R$ 25.340,00)
-    5. **Produto E** - 138 unidades (R$ 23.780,00)
+    1. Produto A - 234 unidades (R$ 45.600,00)
+    2. Produto B - 189 unidades (R$ 32.150,00)
+    3. Produto C - 156 unidades (R$ 28.900,00)
+    4. Produto D - 142 unidades (R$ 25.340,00)
+    5. Produto E - 138 unidades (R$ 23.780,00)
     
     Total: 859 unidades vendidas, R$ 155.770,00 em receita.
     
     Posso detalhar algum produto específico?
     ```
     
-    Para dados de empresa:
+    Para empresa aleatória:
     ```
-    Encontrei 12 notas fiscais da empresa ABC Comércio Ltda:
+    A empresa selecionada foi:
     
-    • Período: Janeiro a Outubro 2025
-    • Valor total: R$ 87.450,00
-    • Ticket médio: R$ 7.287,50
-    • Última nota: 15/10/2025
+    Nome: [Razão Social]
+    CNPJ: [XX.XXX.XXX/XXXX-XX]
+    Nome Fantasia: [Se houver]
     
-    A empresa representa 8% do seu faturamento total no período.
+    Quer ver as notas fiscais dessa empresa?
+    ```
     
-    Quer ver as notas mais recentes ou analisar os produtos comprados?
+    Para follow-up "Qual foi o nome?":
+    ```
+    [Buscar no contexto o nome da empresa mencionada]
+    
+    A empresa era [Nome da Empresa].
+    
+    Posso buscar mais informações sobre ela?
     ```
   
   expected_output: >
     Resposta em linguagem natural que:
     - Responde diretamente à pergunta do usuário
+    - Usa contexto quando é follow-up
     - Formata valores corretamente (R$, %, datas)
-    - Organiza informação de forma clara e escaneável
+    - Organiza informação de forma clara
     - Adiciona contexto e insights relevantes
     - Mantém tom profissional e prestativo
-    - Oferece próximos passos ou perguntas de aprofundamento
+    - Oferece próximos passos
   
   agent: conversation_specialist
 
 direct_conversation:
   description: >
-    Responda à mensagem do usuário: "{message}"
+    ⚠️ ESTA TASK É PARA FOLLOW-UPS E CONVERSAÇÃO!
     
-    Contexto: {chat_history}
+    Contexto completo da conversa: {chat_history}
     
-    Esta é uma interação conversacional sem consulta ao banco.
+    Mensagem do usuário: "{message}"
+    
+    ════════════════════════════════════════════════════════════════
+    INSTRUÇÕES:
+    ════════════════════════════════════════════════════════════════
+    
+    1. SE É FOLLOW-UP (refere-se a resposta anterior):
+       → Busque informação no CONTEXTO acima
+       → NÃO invente informações
+       → Cite o que foi mencionado anteriormente
+       
+       Exemplos:
+       - "Qual foi o nome?" → Buscar empresa/nome no contexto
+       - "Quanto foi mesmo?" → Buscar valor no contexto
+       - "E a empresa?" → Buscar empresa mencionada
+    
+    2. SE É CONVERSAÇÃO GERAL:
+       → Responda de forma amigável
+       → Use as diretrizes abaixo
+    
+    ════════════════════════════════════════════════════════════════
     
     TIPOS DE INTERAÇÃO:
     
@@ -279,7 +334,12 @@ direct_conversation:
        - Pergunte se precisa de mais detalhes
        - Sugira próximos passos
     
-    INFORMAÇÕES DO SISTEMA (use quando relevante):
+    6. FOLLOW-UPS ⭐ NOVO
+       - Busque no contexto acima
+       - Cite informação mencionada antes
+       - Ofereça aprofundar o tópico
+    
+    INFORMAÇÕES DO SISTEMA:
     
     CAPACIDADES:
     • Análise de notas fiscais eletrônicas (NF-e)
@@ -294,22 +354,9 @@ direct_conversation:
     • "Quais são os produtos mais vendidos?"
     • "Mostre as notas da empresa XYZ"
     • "Qual o total de ICMS pago em outubro?"
-    • "Compare as vendas de setembro e outubro"
+    • "Gere uma empresa aleatória do banco"
     
-    ESTRUTURA DO BANCO:
-    • Notas fiscais completas (emitente, destinatário, valores)
-    • Itens detalhados (produtos, quantidades, valores)
-    • Impostos discriminados (ICMS, IPI, PIS, COFINS)
-    • Formas de pagamento
-    • Dados de transporte
-    
-    TECNOLOGIA:
-    • Sistema multi-agente com CrewAI
-    • Banco PostgreSQL (Supabase)
-    • Processamento inteligente de linguagem natural
-    • Consultas SQL otimizadas e seguras
-    
-    EXEMPLOS DE BOAS RESPOSTAS:
+    EXEMPLOS DE RESPOSTAS:
     
     Para "Olá":
     ```
@@ -322,24 +369,18 @@ direct_conversation:
     • Gerar relatórios personalizados
     
     Por exemplo, você pode perguntar:
-    "Quanto vendemos este mês?" ou "Quais os produtos mais vendidos?"
+    "Quanto vendemos este mês?" ou "Gere uma empresa aleatória"
     
     Como posso ajudar você hoje?
     ```
     
-    Para "O que é NF-e?":
+    Para follow-up "Qual foi o nome da empresa?":
     ```
-    NF-e (Nota Fiscal Eletrônica) é um documento fiscal digital que substitui
-    a nota fiscal em papel. Ela contém todas as informações da operação comercial:
+    [Buscar no contexto acima]
     
-    • Dados do emitente e destinatário
-    • Produtos ou serviços vendidos
-    • Valores e impostos (ICMS, IPI, PIS, COFINS)
-    • Forma de pagamento e transporte
+    A empresa mencionada foi [Nome encontrado no contexto].
     
-    O sistema armazena todas essas informações e permite consultas detalhadas.
-    
-    Gostaria de ver exemplos de consultas que posso fazer?
+    Quer ver as notas fiscais dessa empresa?
     ```
     
     Para "Obrigado":
@@ -354,10 +395,10 @@ direct_conversation:
   
   expected_output: >
     Resposta conversacional que:
+    - Usa contexto para follow-ups
     - Mantém tom amigável e profissional
     - Fornece informações úteis e relevantes
-    - Usa o contexto da conversa
-    - Oferece exemplos práticos quando apropriado
+    - Oferece exemplos práticos
     - Encoraja continuação da conversa
     - É concisa mas completa
   
