@@ -8,8 +8,16 @@ from datetime import datetime
 from decimal import Decimal
 import requests
 import json
+import os
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 # Configurações do Supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+
 
 # Headers para requisições
 HEADERS = {
@@ -421,7 +429,7 @@ class SupabaseNFeImporter:
 # ===== EXEMPLO DE USO =====
 if __name__ == "__main__":
     # Caminho do XML
-    xml_path = '42250802314041001583650100000616501312602792.xml'
+    xml_path = '42250802314041001583650100000616501312602792.XML'
     
     # Importar NF-e
     print("=" * 60)
