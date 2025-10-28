@@ -853,6 +853,21 @@ COMMENT ON TABLE nf_cobranca IS 'Dados de cobrança/fatura';
 COMMENT ON TABLE nf_duplicatas IS 'Duplicatas da nota fiscal';
 COMMENT ON TABLE nf_cce IS 'Cartas de Correção Eletrônica';
 
+
+
+ALTER TABLE nf_itens_ipi ALTER COLUMN cst DROP NOT NULL;
+
+-- PIS - tornar CST opcional
+ALTER TABLE nf_itens_pis ALTER COLUMN cst DROP NOT NULL;
+
+-- COFINS - tornar CST opcional
+ALTER TABLE nf_itens_cofins ALTER COLUMN cst DROP NOT NULL;
+
+-- ISSQN - tornar campos opcionais
+ALTER TABLE nf_itens_issqn ALTER COLUMN valor_bc DROP NOT NULL;
+ALTER TABLE nf_itens_issqn ALTER COLUMN aliquota DROP NOT NULL;
+ALTER TABLE nf_itens_issqn ALTER COLUMN valor_issqn DROP NOT NULL;
+
 -- ============================================================================
 -- FIM DO SCHEMA
 -- ============================================================================

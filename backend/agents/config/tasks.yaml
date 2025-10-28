@@ -1,0 +1,114 @@
+# agents/config/tasks.yaml
+# Configuração das tarefas para o sistema multi-agente de NF-e
+
+analyze_intent:
+  description: >
+    Analise a mensagem do usuário: "{message}"
+
+    Contexto da conversa: {chat_history}
+
+    Determine se a mensagem requer:
+    1. Consulta ao banco de dados (perguntas sobre dados específicos de NF-e)
+    2. Resposta conversacional (perguntas gerais, saudações, explicações)
+    
+    Considere que perguntas sobre valores, quantidades, datas, empresas, produtos,
+    impostos ou qualquer informação específica de notas fiscais requerem consulta ao banco.
+    
+    Perguntas sobre como o sistema funciona, saudações, agradecimentos ou pedidos de
+    explicação sobre conceitos gerais são conversacionais.
+  expected_output: >
+    Uma decisão clara: "database_query" ou "conversation_only"
+    com justificativa breve sobre por que essa estratégia foi escolhida
+  agent: coordinator
+
+execute_sql_query:
+  description: >
+    Execute uma consulta SQL para responder: "{message}"
+
+    Schema disponível: {database_schema}
+    Contexto da conversa: {chat_history}
+
+    Passos a seguir:
+    1. Analise a pergunta do usuário e identifique quais tabelas e colunas são necessárias
+    2. Gere uma query SQL SELECT válida e otimizada
+    3. Use JOINs apropriados quando precisar relacionar tabelas
+    4. Limite os resultados a um número razoável (use LIMIT)
+    5. Use agregações (SUM, COUNT, AVG) quando apropriado
+    6. Formate valores monetários corretamente
+    7. Execute a query usando a DatabaseQueryTool
+    8. Retorne os resultados estruturados
+    
+    IMPORTANTE:
+    - Apenas queries SELECT são permitidas
+    - Sempre use LIMIT para evitar retornar muitos dados
+    - Use aliases descritivos nas colunas
+    - Considere o contexto da conversa para refinar a query
+  expected_output: >
+    Resultados da query em formato estruturado contendo:
+    - Query SQL executada (para referência)
+    - Dados retornados em formato tabular
+    - Contagem de registros encontrados
+    - Resumo breve dos resultados (ex: "Encontradas 5 notas fiscais")
+  agent: sql_specialist
+
+format_response:
+  description: >
+    Formate a seguinte informação em uma resposta natural e amigável:
+
+    Dados da consulta SQL: {query_results}
+    Mensagem original do usuário: "{message}"
+    Contexto da conversa: {chat_history}
+
+    Diretrizes para formatação:
+    1. Transforme os dados técnicos em linguagem natural e acessível
+    2. Use formatação apropriada para valores monetários (R$ com separadores de milhares)
+    3. Organize informações de forma clara (use listas quando apropriado)
+    4. Destaque informações mais relevantes primeiro
+    5. Mantenha tom profissional mas amigável
+    6. Se houver muitos resultados, resuma os principais e mencione o total
+    7. Contextualize a resposta com base no histórico da conversa
+    8. Ofereça informações adicionais relevantes quando apropriado
+    
+    Exemplos de boa formatação:
+    - "Encontrei 3 notas fiscais emitidas em janeiro de 2025, totalizando R$ 15.430,50"
+    - "A empresa XYZ emitiu 12 notas fiscais este mês, com valor médio de R$ 2.340,00"
+    - "Os principais produtos foram: 1) Produto A (45 unidades), 2) Produto B (32 unidades)"
+  expected_output: >
+    Uma resposta em linguagem natural, amigável e contextualizada que:
+    - Responde diretamente à pergunta do usuário
+    - Formata valores monetários em R$ com separadores corretos
+    - Explica os dados de forma clara e acessível
+    - Mantém tom profissional e prestativo
+    - Oferece contexto adicional quando relevante
+  agent: conversation_specialist
+
+direct_conversation:
+  description: >
+    Responda à mensagem do usuário: "{message}"
+
+    Contexto da conversa: {chat_history}
+
+    Esta é uma interação conversacional que não requer consulta ao banco de dados.
+    Pode ser uma saudação, pergunta sobre o sistema, pedido de explicação, ou
+    agradecimento.
+
+    Diretrizes:
+    1. Seja amigável e profissional
+    2. Forneça informações úteis sobre o sistema quando perguntado
+    3. Explique conceitos de notas fiscais de forma clara quando necessário
+    4. Mantenha respostas concisas mas completas
+    5. Use o contexto da conversa para personalizar a resposta
+    6. Ofereça ajuda adicional quando apropriado
+    
+    Informações sobre o sistema que você pode compartilhar:
+    - O sistema processa notas fiscais eletrônicas (NF-e)
+    - Pode responder perguntas sobre valores, produtos, empresas, impostos
+    - Mantém histórico da conversa para perguntas de acompanhamento
+    - Usa três agentes especializados para processar requisições
+  expected_output: >
+    Uma resposta conversacional direta, profissional e amigável que:
+    - Responde adequadamente à mensagem do usuário
+    - Mantém tom acolhedor e prestativo
+    - Fornece informações úteis quando solicitado
+    - Encoraja o usuário a fazer mais perguntas se necessário
+  agent: conversation_specialist
