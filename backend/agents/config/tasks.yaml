@@ -4,111 +4,361 @@
 analyze_intent:
   description: >
     Analise a mensagem do usuário: "{message}"
-
+    
     Contexto da conversa: {chat_history}
-
+    
     Determine se a mensagem requer:
-    1. Consulta ao banco de dados (perguntas sobre dados específicos de NF-e)
-    2. Resposta conversacional (perguntas gerais, saudações, explicações)
+    1. **database_query** - Consulta ao banco de dados
+    2. **conversation_only** - Resposta conversacional
     
-    Considere que perguntas sobre valores, quantidades, datas, empresas, produtos,
-    impostos ou qualquer informação específica de notas fiscais requerem consulta ao banco.
+    REQUER DATABASE_QUERY quando pergunta sobre:
+    ✓ Valores, quantidades, totais (Ex: "quanto vendemos?", "qual o valor total?")
+    ✓ Datas específicas (Ex: "vendas de janeiro", "notas de hoje")
+    ✓ Empresas/clientes (Ex: "notas da empresa X", "maiores clientes")
+    ✓ Produtos (Ex: "produtos mais vendidos", "quais itens foram vendidos")
+    ✓ Impostos (Ex: "total de ICMS", "quanto pagamos de PIS")
+    ✓ Estatísticas (Ex: "média de vendas", "top 10 produtos")
+    ✓ Comparações (Ex: "vendas este mês vs mês passado")
     
-    Perguntas sobre como o sistema funciona, saudações, agradecimentos ou pedidos de
-    explicação sobre conceitos gerais são conversacionais.
+    REQUER CONVERSATION_ONLY quando:
+    ✓ Saudações (Ex: "olá", "bom dia", "oi")
+    ✓ Agradecimentos (Ex: "obrigado", "valeu")
+    ✓ Perguntas sobre o sistema (Ex: "o que você pode fazer?", "como funciona?")
+    ✓ Explicações gerais (Ex: "o que é NF-e?", "como importar notas?")
+    ✓ Confirmações (Ex: "ok", "entendi", "certo")
+    
+    EXEMPLOS:
+    - "Quanto vendemos em janeiro?" → database_query
+    - "Quais são os 5 produtos mais vendidos?" → database_query
+    - "Olá, tudo bem?" → conversation_only
+    - "O que é uma nota fiscal eletrônica?" → conversation_only
+  
   expected_output: >
-    Uma decisão clara: "database_query" ou "conversation_only"
-    com justificativa breve sobre por que essa estratégia foi escolhida
+    JSON com:
+    {
+      "strategy": "database_query" ou "conversation_only",
+      "confidence": "high" ou "medium" ou "low",
+      "reasoning": "breve justificativa (1-2 frases)",
+      "detected_entities": {
+        "time_period": "se houver referência a período",
+        "companies": ["se houver menção a empresas"],
+        "products": ["se houver menção a produtos"],
+        "metrics": ["valores mencionados: total, média, quantidade, etc"]
+      }
+    }
+  
   agent: coordinator
 
 execute_sql_query:
   description: >
     Execute uma consulta SQL para responder: "{message}"
-
-    Schema disponível: {database_schema}
-    Contexto da conversa: {chat_history}
-
-    Passos a seguir:
-    1. Analise a pergunta do usuário e identifique quais tabelas e colunas são necessárias
-    2. Gere uma query SQL SELECT válida e otimizada
-    3. Use JOINs apropriados quando precisar relacionar tabelas
-    4. Limite os resultados a um número razoável (use LIMIT)
-    5. Use agregações (SUM, COUNT, AVG) quando apropriado
-    6. Formate valores monetários corretamente
-    7. Execute a query usando a DatabaseQueryTool
-    8. Retorne os resultados estruturados
     
-    IMPORTANTE:
-    - Apenas queries SELECT são permitidas
-    - Sempre use LIMIT para evitar retornar muitos dados
-    - Use aliases descritivos nas colunas
-    - Considere o contexto da conversa para refinar a query
+    Schema disponível:
+    {database_schema}
+    
+    Entidades detectadas: {detected_entities}
+    Contexto: {chat_history}
+    
+    PROCESSO OBRIGATÓRIO:
+    
+    1. ANÁLISE DA PERGUNTA
+       - Identifique o objetivo (total? lista? comparação? média?)
+       - Identifique filtros (período, empresa, produto, status)
+       - Identifique agregações necessárias (SUM, COUNT, AVG, etc)
+    
+    2. SELEÇÃO DE TABELAS
+       - notas_fiscais: para dados gerais da NF
+       - empresas: para emitentes/destinatários
+       - nf_itens: para produtos/serviços
+       - nf_itens_icms/ipi/pis/cofins: para impostos
+       - nf_pagamentos: para formas de pagamento
+    
+    3. CONSTRUÇÃO DA QUERY
+       - Use SELECT com colunas específicas (nunca SELECT *)
+       - Use JOINs apropriados (INNER para obrigatório, LEFT para opcional)
+       - Adicione WHERE com filtros relevantes
+       - SEMPRE filtre status='autorizada' (notas válidas)
+       - Use GROUP BY para agregações
+       - Use ORDER BY para ordenação lógica
+       - SEMPRE adicione LIMIT (máx 100)
+    
+    4. VALIDAÇÃO
+       - Apenas SELECT permitido (nunca INSERT/UPDATE/DELETE)
+       - Sintaxe PostgreSQL válida
+       - Aliases descritivos nas colunas
+       - Valores monetários como NUMERIC
+    
+    5. FORMATAÇÃO
+       - Use TO_CHAR para formatar datas
+       - Use ROUND para valores monetários (2 casas)
+       - Use aliases legíveis (total_vendas, quantidade_produtos, etc)
+    
+    EXEMPLOS DE QUERIES BEM FEITAS:
+    
+    Pergunta: "Quanto vendemos este mês?"
+    ```sql
+    SELECT 
+      COUNT(*) as total_notas,
+      ROUND(SUM(valor_total_nota)::numeric, 2) as valor_total,
+      ROUND(AVG(valor_total_nota)::numeric, 2) as valor_medio
+    FROM notas_fiscais
+    WHERE status = 'autorizada'
+      AND DATE_TRUNC('month', data_hora_emissao) = DATE_TRUNC('month', CURRENT_DATE)
+    LIMIT 1;
+    ```
+    
+    Pergunta: "Top 5 produtos mais vendidos"
+    ```sql
+    SELECT 
+      i.descricao as produto,
+      SUM(i.quantidade_comercial) as quantidade_total,
+      ROUND(SUM(i.valor_total_bruto)::numeric, 2) as valor_total
+    FROM nf_itens i
+    INNER JOIN notas_fiscais nf ON i.nota_fiscal_id = nf.id
+    WHERE nf.status = 'autorizada'
+    GROUP BY i.descricao
+    ORDER BY quantidade_total DESC
+    LIMIT 5;
+    ```
+    
+    Pergunta: "Notas da empresa ABC"
+    ```sql
+    SELECT 
+      nf.numero_nf,
+      nf.serie,
+      TO_CHAR(nf.data_hora_emissao, 'DD/MM/YYYY') as data_emissao,
+      ROUND(nf.valor_total_nota::numeric, 2) as valor_total,
+      e.razao_social as emitente
+    FROM notas_fiscais nf
+    LEFT JOIN empresas e ON nf.emitente_id = e.id
+    WHERE nf.status = 'autorizada'
+      AND e.razao_social ILIKE '%ABC%'
+    ORDER BY nf.data_hora_emissao DESC
+    LIMIT 20;
+    ```
+  
   expected_output: >
-    Resultados da query em formato estruturado contendo:
-    - Query SQL executada (para referência)
-    - Dados retornados em formato tabular
-    - Contagem de registros encontrados
-    - Resumo breve dos resultados (ex: "Encontradas 5 notas fiscais")
+    JSON estruturado:
+    {
+      "query": "SQL query executada (para auditoria)",
+      "results": [array de objetos com os dados],
+      "row_count": número de registros retornados,
+      "summary": "resumo breve (ex: 'Encontradas 5 notas totalizando R$ 10.000')",
+      "execution_time_ms": tempo de execução em milissegundos,
+      "columns": ["lista de colunas retornadas"]
+    }
+  
   agent: sql_specialist
 
 format_response:
   description: >
-    Formate a seguinte informação em uma resposta natural e amigável:
-
-    Dados da consulta SQL: {query_results}
-    Mensagem original do usuário: "{message}"
-    Contexto da conversa: {chat_history}
-
-    Diretrizes para formatação:
-    1. Transforme os dados técnicos em linguagem natural e acessível
-    2. Use formatação apropriada para valores monetários (R$ com separadores de milhares)
-    3. Organize informações de forma clara (use listas quando apropriado)
-    4. Destaque informações mais relevantes primeiro
-    5. Mantenha tom profissional mas amigável
-    6. Se houver muitos resultados, resuma os principais e mencione o total
-    7. Contextualize a resposta com base no histórico da conversa
-    8. Ofereça informações adicionais relevantes quando apropriado
+    Formate os dados em uma resposta natural e profissional:
     
-    Exemplos de boa formatação:
-    - "Encontrei 3 notas fiscais emitidas em janeiro de 2025, totalizando R$ 15.430,50"
-    - "A empresa XYZ emitiu 12 notas fiscais este mês, com valor médio de R$ 2.340,00"
-    - "Os principais produtos foram: 1) Produto A (45 unidades), 2) Produto B (32 unidades)"
+    Dados da consulta: {query_results}
+    Mensagem original: "{message}"
+    Contexto: {chat_history}
+    
+    DIRETRIZES DE FORMATAÇÃO:
+    
+    1. ESTRUTURA DA RESPOSTA
+       ✓ Comece respondendo diretamente à pergunta
+       ✓ Apresente os principais dados/destaques
+       ✓ Forneça detalhes adicionais se relevante
+       ✓ Conclua com oferta de ajuda adicional
+    
+    2. FORMATAÇÃO DE VALORES
+       ✓ Monetários: R$ 1.234,56 (com separadores)
+       ✓ Grandes números: 1.234 (separador de milhares)
+       ✓ Percentuais: 15,5% (uma casa decimal)
+       ✓ Datas: 27/10/2025 ou "outubro de 2025"
+    
+    3. ORGANIZAÇÃO VISUAL
+       ✓ Use listas numeradas para rankings
+       ✓ Use bullet points para itens não ordenados
+       ✓ Use negrito para destacar valores importantes (quando suportado)
+       ✓ Separe seções com quebras de linha
+    
+    4. TOM E ESTILO
+       ✓ Profissional mas acessível
+       ✓ Conciso mas completo
+       ✓ Use contexto da conversa para personalizar
+       ✓ Evite jargão técnico desnecessário
+    
+    5. CONTEXTUALIZAÇÃO
+       ✓ Compare com períodos anteriores quando relevante
+       ✓ Destaque tendências ou padrões
+       ✓ Adicione insights quando apropriado
+       ✓ Sugira análises complementares
+    
+    EXEMPLOS DE BOAS RESPOSTAS:
+    
+    Para query de vendas mensais:
+    ```
+    Em outubro de 2025, foram emitidas 45 notas fiscais totalizando R$ 125.430,50.
+    
+    Isso representa:
+    • Valor médio por nota: R$ 2.787,34
+    • 15% a mais que setembro
+    • Maior volume do trimestre
+    
+    Gostaria de ver o detalhamento por produto ou por cliente?
+    ```
+    
+    Para ranking de produtos:
+    ```
+    Os 5 produtos mais vendidos em outubro foram:
+    
+    1. **Produto A** - 234 unidades (R$ 45.600,00)
+    2. **Produto B** - 189 unidades (R$ 32.150,00)
+    3. **Produto C** - 156 unidades (R$ 28.900,00)
+    4. **Produto D** - 142 unidades (R$ 25.340,00)
+    5. **Produto E** - 138 unidades (R$ 23.780,00)
+    
+    Total: 859 unidades vendidas, R$ 155.770,00 em receita.
+    
+    Posso detalhar algum produto específico?
+    ```
+    
+    Para dados de empresa:
+    ```
+    Encontrei 12 notas fiscais da empresa ABC Comércio Ltda:
+    
+    • Período: Janeiro a Outubro 2025
+    • Valor total: R$ 87.450,00
+    • Ticket médio: R$ 7.287,50
+    • Última nota: 15/10/2025
+    
+    A empresa representa 8% do seu faturamento total no período.
+    
+    Quer ver as notas mais recentes ou analisar os produtos comprados?
+    ```
+  
   expected_output: >
-    Uma resposta em linguagem natural, amigável e contextualizada que:
+    Resposta em linguagem natural que:
     - Responde diretamente à pergunta do usuário
-    - Formata valores monetários em R$ com separadores corretos
-    - Explica os dados de forma clara e acessível
+    - Formata valores corretamente (R$, %, datas)
+    - Organiza informação de forma clara e escaneável
+    - Adiciona contexto e insights relevantes
     - Mantém tom profissional e prestativo
-    - Oferece contexto adicional quando relevante
+    - Oferece próximos passos ou perguntas de aprofundamento
+  
   agent: conversation_specialist
 
 direct_conversation:
   description: >
     Responda à mensagem do usuário: "{message}"
-
-    Contexto da conversa: {chat_history}
-
-    Esta é uma interação conversacional que não requer consulta ao banco de dados.
-    Pode ser uma saudação, pergunta sobre o sistema, pedido de explicação, ou
-    agradecimento.
-
-    Diretrizes:
-    1. Seja amigável e profissional
-    2. Forneça informações úteis sobre o sistema quando perguntado
-    3. Explique conceitos de notas fiscais de forma clara quando necessário
-    4. Mantenha respostas concisas mas completas
-    5. Use o contexto da conversa para personalizar a resposta
-    6. Ofereça ajuda adicional quando apropriado
     
-    Informações sobre o sistema que você pode compartilhar:
-    - O sistema processa notas fiscais eletrônicas (NF-e)
-    - Pode responder perguntas sobre valores, produtos, empresas, impostos
-    - Mantém histórico da conversa para perguntas de acompanhamento
-    - Usa três agentes especializados para processar requisições
+    Contexto: {chat_history}
+    
+    Esta é uma interação conversacional sem consulta ao banco.
+    
+    TIPOS DE INTERAÇÃO:
+    
+    1. SAUDAÇÕES
+       - Responda de forma amigável e profissional
+       - Apresente brevemente suas capacidades
+       - Ofereça exemplos de perguntas
+    
+    2. AGRADECIMENTOS
+       - Reconheça o agradecimento
+       - Ofereça ajuda adicional
+       - Mantenha a conversa aberta
+    
+    3. PERGUNTAS SOBRE O SISTEMA
+       - Explique funcionalidades de forma clara
+       - Dê exemplos práticos
+       - Direcione para próximas ações
+    
+    4. EXPLICAÇÕES DE CONCEITOS
+       - Explique de forma acessível
+       - Use analogias quando apropriado
+       - Ofereça informações complementares
+    
+    5. CONFIRMAÇÕES
+       - Confirme entendimento
+       - Pergunte se precisa de mais detalhes
+       - Sugira próximos passos
+    
+    INFORMAÇÕES DO SISTEMA (use quando relevante):
+    
+    CAPACIDADES:
+    • Análise de notas fiscais eletrônicas (NF-e)
+    • Consultas sobre vendas, produtos, clientes
+    • Cálculos de impostos (ICMS, IPI, PIS, COFINS)
+    • Estatísticas e relatórios personalizados
+    • Comparações entre períodos
+    • Rankings e top listas
+    
+    EXEMPLOS DE PERGUNTAS:
+    • "Quanto vendemos este mês?"
+    • "Quais são os produtos mais vendidos?"
+    • "Mostre as notas da empresa XYZ"
+    • "Qual o total de ICMS pago em outubro?"
+    • "Compare as vendas de setembro e outubro"
+    
+    ESTRUTURA DO BANCO:
+    • Notas fiscais completas (emitente, destinatário, valores)
+    • Itens detalhados (produtos, quantidades, valores)
+    • Impostos discriminados (ICMS, IPI, PIS, COFINS)
+    • Formas de pagamento
+    • Dados de transporte
+    
+    TECNOLOGIA:
+    • Sistema multi-agente com CrewAI
+    • Banco PostgreSQL (Supabase)
+    • Processamento inteligente de linguagem natural
+    • Consultas SQL otimizadas e seguras
+    
+    EXEMPLOS DE BOAS RESPOSTAS:
+    
+    Para "Olá":
+    ```
+    Olá! 👋 Sou seu assistente de análise de notas fiscais eletrônicas.
+    
+    Posso ajudá-lo a:
+    • Consultar vendas e faturamento
+    • Analisar produtos e clientes
+    • Verificar impostos e pagamentos
+    • Gerar relatórios personalizados
+    
+    Por exemplo, você pode perguntar:
+    "Quanto vendemos este mês?" ou "Quais os produtos mais vendidos?"
+    
+    Como posso ajudar você hoje?
+    ```
+    
+    Para "O que é NF-e?":
+    ```
+    NF-e (Nota Fiscal Eletrônica) é um documento fiscal digital que substitui
+    a nota fiscal em papel. Ela contém todas as informações da operação comercial:
+    
+    • Dados do emitente e destinatário
+    • Produtos ou serviços vendidos
+    • Valores e impostos (ICMS, IPI, PIS, COFINS)
+    • Forma de pagamento e transporte
+    
+    O sistema armazena todas essas informações e permite consultas detalhadas.
+    
+    Gostaria de ver exemplos de consultas que posso fazer?
+    ```
+    
+    Para "Obrigado":
+    ```
+    Por nada! 😊 Fico feliz em ajudar.
+    
+    Se precisar de mais análises ou tiver outras dúvidas sobre suas notas
+    fiscais, estou aqui.
+    
+    Até logo!
+    ```
+  
   expected_output: >
-    Uma resposta conversacional direta, profissional e amigável que:
-    - Responde adequadamente à mensagem do usuário
-    - Mantém tom acolhedor e prestativo
-    - Fornece informações úteis quando solicitado
-    - Encoraja o usuário a fazer mais perguntas se necessário
+    Resposta conversacional que:
+    - Mantém tom amigável e profissional
+    - Fornece informações úteis e relevantes
+    - Usa o contexto da conversa
+    - Oferece exemplos práticos quando apropriado
+    - Encoraja continuação da conversa
+    - É concisa mas completa
+  
   agent: conversation_specialist
