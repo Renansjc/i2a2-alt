@@ -24,6 +24,7 @@ from pathlib import Path
 
 from agents.tools.database_tool import DatabaseQueryTool, DatabaseJoinQueryTool
 from agents.tools.schema_tool import SchemaInfoTool, SchemaSearchTool
+from agents.tools.sql_query_tool import SQLQueryTool
 from config import settings
 
 
@@ -64,8 +65,9 @@ class NFeCrew:
             self.tasks_config = yaml.safe_load(f)
         
         # Initialize tools
-        self.db_tool = DatabaseQueryTool()
-        self.db_join_tool = DatabaseJoinQueryTool()
+        self.sql_tool = SQLQueryTool()  # Direct SQL - most powerful
+        self.db_tool = DatabaseQueryTool()  # REST API fallback
+        self.db_join_tool = DatabaseJoinQueryTool()  # REST API with joins
         self.schema_tool = SchemaInfoTool()
         self.schema_search_tool = SchemaSearchTool()
     
@@ -91,8 +93,7 @@ class NFeCrew:
             goal=self.agents_config['sql_specialist']['goal'],
             backstory=self.agents_config['sql_specialist']['backstory'],
             tools=[
-                self.db_tool,
-                self.db_join_tool,
+                self.sql_tool,  # Primary: Direct SQL queries
                 self.schema_tool,
                 self.schema_search_tool
             ],
@@ -130,7 +131,7 @@ class NFeCrew:
     @agent
     def coordinator(self) -> Agent:
         """
-        Coordinator Agent (Manager)
+        Coordinator Agent
         
         Responsible for:
         - Analyzing user message intent
@@ -138,40 +139,80 @@ class NFeCrew:
         - Delegating tasks to specialized agents
         - Coordinating the overall response flow
         
-        This agent acts as the manager in the hierarchical process,
-        automatically delegating tasks to sql_specialist or conversation_specialist
-        based on the user's needs.
+        Has access to all tools to handle requests directly or delegate.
         """
         return Agent(
             role=self.agents_config['coordinator']['role'],
             goal=self.agents_config['coordinator']['goal'],
             backstory=self.agents_config['coordinator']['backstory'],
-            tools=[],  # Coordinator doesn't use tools directly
+            tools=[
+                self.sql_tool,  # Primary: Direct SQL queries
+                self.schema_tool,
+                self.schema_search_tool
+            ],  # Coordinator has all tools available
             verbose=True,
             allow_delegation=True,  # Can delegate to other agents
-            max_iter=20,  # Allow more iterations for coordination
+            max_iter=25,  # Allow more iterations
             memory=True  # Enable memory for context
         )
     
     @task
-    def analyze_intent_task(self) -> Task:
+    def process_user_message_task(self) -> Task:
         """
-        Task: Analyze user message intent
+        Task: Process user message
         
-        This task is executed by the coordinator to determine whether
-        the user's message requires a database query or a conversational response.
+        This is the main task that processes the user's message.
+        The coordinator handles the request directly or delegates as needed.
         
         Inputs:
         - message: User's message
         - chat_history: Previous conversation context
+        - database_schema: Database schema information
         
         Output:
-        - Decision: "database_query" or "conversation_only"
-        - Justification: Brief explanation of the decision
+        - Complete response to the user's message
         """
         return Task(
-            description=self.tasks_config['analyze_intent']['description'],
-            expected_output=self.tasks_config['analyze_intent']['expected_output'],
+            description="""
+            Responda à mensagem do usuário: "{message}"
+            
+            Contexto: {chat_history}
+            Schema disponível: {database_schema}
+            
+            INSTRUÇÕES CRÍTICAS:
+            
+            1. Para perguntas sobre DADOS (valores, quantidades, empresas, produtos):
+               ⚠️ SEMPRE execute uma query SQL - NUNCA use informações da memória!
+               ⚠️ Dados podem ter mudado - sempre consulte o banco atual!
+               
+               - Use SQL Query Tool para consultar o banco diretamente
+               - Escreva uma query SQL SELECT completa em PostgreSQL
+               - Exemplos:
+                 * Contar: SELECT COUNT(*) as total FROM notas_fiscais
+                 * Contar com filtro: SELECT COUNT(*) as total FROM notas_fiscais WHERE status = 'autorizada'
+                 * Somar: SELECT SUM(valor_total_nota) as total FROM notas_fiscais
+                 * JOIN: SELECT e.razao_social, COUNT(nf.id) FROM empresas e JOIN notas_fiscais nf ON e.id = nf.emitente_id GROUP BY e.razao_social
+               - Execute a query e formate a resposta em linguagem natural
+            
+            2. Para perguntas CONVERSACIONAIS (saudação, explicação, ajuda):
+               - Responda diretamente de forma amigável
+               - Explique como o sistema funciona se perguntado
+               - Ofereça ajuda adicional
+            
+            3. REGRA DE OURO:
+               - Se a pergunta menciona números, valores, quantidades → EXECUTE SQL
+               - NUNCA responda com dados da memória
+               - Sempre responda em português brasileiro
+               - Use formatação R$ para valores monetários
+               - Seja claro, preciso e amigável
+            """,
+            expected_output="""
+            Uma resposta completa em português que:
+            - Responde diretamente à pergunta
+            - Usa linguagem natural e amigável
+            - Formata valores corretamente (R$)
+            - É precisa e útil
+            """,
             agent=self.coordinator()
         )
     
@@ -249,44 +290,42 @@ class NFeCrew:
     @crew
     def crew(self) -> Crew:
         """
-        Create the NFeCrew with hierarchical process.
+        Create the NFeCrew with sequential process.
         
-        The crew uses a hierarchical process where the coordinator agent
-        acts as a manager, automatically delegating tasks to specialized agents.
+        The crew uses a sequential process where tasks are executed in order.
+        The coordinator can delegate to specialized agents as needed.
         
         Process Flow:
         1. User message arrives
-        2. Coordinator analyzes intent
-        3. Coordinator delegates to:
-           - SQL Specialist (if database query needed)
-           - Conversation Specialist (if conversational response needed)
-        4. Results are formatted by Conversation Specialist
+        2. Main task processes the message
+        3. Agent determines if database query or conversation is needed
+        4. Appropriate specialist handles the request
         5. Final response is returned
         
         Features:
-        - Hierarchical process with automatic delegation
+        - Sequential process with delegation capabilities
         - Built-in memory for conversation context
         - Verbose logging for debugging
-        - Manager agent (coordinator) orchestrates the flow
+        - Agents can delegate to each other
         """
         # Prepare crew configuration
-        # Note: In hierarchical process, manager_agent should NOT be in agents list
         crew_config = {
             "agents": [
+                self.coordinator(),
                 self.sql_specialist(),
                 self.conversation_specialist()
             ],
-            "tasks": [],  # Tasks are added dynamically in process_message
-            "process": Process.hierarchical,  # Coordinator manages automatically
-            "manager_agent": self.coordinator(),  # Coordinator is the manager
+            "tasks": [
+                # Single main task that handles the entire flow
+                self.process_user_message_task()
+            ],
+            "process": Process.sequential,  # Sequential execution
             "verbose": True,  # Enable detailed logging
-            "memory": True,  # Enable conversation memory
+            "memory": True,  # Enable memory for conversation context
         }
         
-        # Add embedder configuration if semantic search is enabled
-        # and OpenAI API key is available
+        # Add embedder configuration for semantic memory
         if settings.enable_semantic_search and settings.openai_api_key:
-            # Set CHROMA_OPENAI_API_KEY for CrewAI's memory system
             import os
             os.environ["CHROMA_OPENAI_API_KEY"] = settings.openai_api_key
             

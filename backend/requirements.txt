@@ -19,6 +19,9 @@ pydantic-settings>=2.0.0
 # HTTP Client (for Supabase REST API)
 requests>=2.31.0
 
+# PostgreSQL Database Driver
+psycopg2-binary>=2.9.9
+
 # Utilities
 python-dateutil>=2.8.2
 python-dotenv>=1.0.0
