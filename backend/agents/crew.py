@@ -162,7 +162,49 @@ class NFeCrew:
             memory=False,
             llm=self._create_llm('conversation_specialist')  # ✅ LLM from YAML
         )
-    
+
+    @agent
+    def fiscal_specialist(self) -> Agent:
+        """
+        Fiscal Specialist Agent
+        
+        Responsible for:
+        - Analyzing tax-related questions
+        - Calculating tax burdens and effective rates
+        - Identifying fiscal inconsistencies
+        - Providing guidance on tax compliance
+        - Analyzing CST, CSOSN, CFOP codes
+        - Tax credit analysis
+        - Comparing tax periods
+        
+        Tools:
+        - SchemaInfoTool: Understand database structure for tax queries
+        - SchemaSearchTool: Search for tax-related tables/columns
+        - Does NOT execute SQL directly (delegates to sql_specialist)
+        
+        Configuration:
+        - Model and temperature loaded from agents.yaml
+        - allow_delegation=False: Does not delegate (works with coordinator)
+        - temperature=0.2: Precise for tax calculations
+        """
+        config = self.agents_config['fiscal_specialist']
+        
+        return Agent(
+            role=config['role'],
+            goal=config['goal'],
+            backstory=config['backstory'],
+            tools=[
+                self.schema_tool,  # To understand tax-related schema
+                self.schema_search_tool  # To search for tax columns
+            ],
+            verbose=config.get('verbose', True),
+            allow_delegation=config.get('allow_delegation', False),
+            max_iter=4,
+            memory=False,
+            llm=self._create_llm('fiscal_specialist')  # ✅ LLM from YAML
+        )
+
+
     @agent
     def coordenador(self) -> Agent:
         """
@@ -339,6 +381,32 @@ class NFeCrew:
             expected_output=self.tasks_config['direct_conversation']['expected_output'],
             agent=self.conversation_specialist()
         )
+
+    @task
+    def fiscal_analysis_task(self) -> Task:
+        """
+        Task: Fiscal Analysis
+        
+        This task is executed by the fiscal_specialist to analyze
+        tax-related questions, calculate tax burdens, identify
+        fiscal inconsistencies, and provide tax guidance.
+        
+        Inputs:
+        - message: User's fiscal question
+        - chat_history: Previous conversation context
+        - query_results: Tax data from database (if consulted)
+        
+        Output:
+        - Comprehensive fiscal analysis
+        - Tax calculations with proper formatting
+        - Legal context when applicable
+        - Recommendations and alerts
+        """
+        return Task(
+            description=self.tasks_config['fiscal_analysis']['description'],
+            expected_output=self.tasks_config['fiscal_analysis']['expected_output'],
+            agent=self.fiscal_specialist()
+        )        
     
     @crew
     def crew(self) -> Crew:
@@ -346,12 +414,14 @@ class NFeCrew:
             agents=[
                 self.coordenador(),
                 self.sql_specialist(),
+                self.fiscal_specialist(),
                 self.conversation_specialist()
             ],
             tasks=[
                 # ✅ PASSAR TODAS AS TASKS
                 self.process_user_message_task(),
-                self.execute_sql_query_task(),      # Para SQL Specialist
+                self.execute_sql_query_task(),
+                self.fiscal_analysis_task(),      # Para SQL Specialist
                 self.format_response_task(),         # Para Conversation
                 self.direct_conversation_task()     # Para Conversation
             ],

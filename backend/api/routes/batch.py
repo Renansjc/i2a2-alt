@@ -93,13 +93,10 @@ async def _run_batch_processing(
         if folder_path.startswith(tempfile.gettempdir()):
             temp_dir = folder_path
         
-        # Create processor with custom concurrency if specified
-        processor = batch_processor
-        if max_concurrent is not None:
-            processor = BatchProcessor(max_concurrent=max_concurrent)
-        
-        # Run batch processing
-        result = await processor.process_folder(
+        # Use the global batch processor instance
+        # Note: max_concurrent is only used during initialization,
+        # so we ignore it here and use the configured value
+        result = await batch_processor.process_folder(
             folder_path=folder_path,
             job_id=job_id
         )

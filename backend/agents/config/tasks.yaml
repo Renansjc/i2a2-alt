@@ -403,3 +403,77 @@ direct_conversation:
     - É concisa mas completa
   
   agent: conversation_specialist
+
+fiscal_analysis:
+  description: >
+    ⚠️ PRIMEIRO: A pergunta "{message}" é uma pergunta FISCAL ou apenas de DADOS?
+    
+    Dados disponíveis: {query_results}
+    
+    ════════════════════════════════════════════════════════════════
+    DECISÃO CRÍTICA:
+    ════════════════════════════════════════════════════════════════
+    
+    PERGUNTAS FISCAIS (faça análise completa):
+    ✓ Contém palavras: "carga tributária", "impostos", "fiscal", "crédito",
+      "alíquota", "CST", "CFOP", "conformidade", "auditoria", "ST"
+    ✓ Pede análise, interpretação ou orientação tributária
+    ✓ Compara tributação entre períodos
+    
+    PERGUNTAS DE DADOS (apenas formate, SEM análise):
+    ✗ "Quantas notas...", "Qual o total...", "Mostre...", "Liste..."
+    ✗ Pede apenas números, listas, rankings
+    ✗ Não menciona aspectos tributários
+    
+    ════════════════════════════════════════════════════════════════
+    
+    SE FOR PERGUNTA DE DADOS (maioria dos casos):
+    → Apenas formate os dados de {query_results}
+    → Use linguagem simples e direta
+    → NÃO adicione contexto fiscal
+    → NÃO dê recomendações tributárias
+    → NÃO use emojis fiscais (📊, 🔍, ⚠️)
+    → Seja objetivo: "Você tem X notas fiscais."
+    
+    SE FOR PERGUNTA FISCAL (raro):
+    → Faça análise tributária completa
+    → Calcule indicadores (carga, alíquotas efetivas)
+    → Identifique riscos e oportunidades
+    → Dê recomendações específicas
+    → Use formatação profissional
+    
+    ════════════════════════════════════════════════════════════════
+    EXEMPLOS:
+    ════════════════════════════════════════════════════════════════
+    
+    Pergunta: "Quantas notas fiscais eu tenho?"
+    Tipo: DADOS
+    Resposta:
+    ```
+    Você possui 10 notas fiscais autorizadas.
+    ```
+    
+    Pergunta: "Qual minha carga tributária?"
+    Tipo: FISCAL
+    Resposta:
+    ```
+    📊 CARGA TRIBUTÁRIA EFETIVA
+    
+    Sua carga tributária é de 23,45%.
+    
+    COMPOSIÇÃO:
+    • ICMS: 17,00%
+    • PIS: 1,65%
+    • COFINS: 7,60%
+    • IPI: 3,00%
+    
+    RECOMENDAÇÕES:
+    • Verificar créditos de ICMS não aproveitados
+    • Analisar benefícios fiscais disponíveis
+    ```
+  
+  expected_output: >
+    Para perguntas de DADOS: resposta direta e objetiva, sem análise fiscal.
+    Para perguntas FISCAIS: análise tributária completa com recomendações.
+  
+  agent: fiscal_specialist
