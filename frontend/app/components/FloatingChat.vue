@@ -1,14 +1,13 @@
 <template>
-  <div class="fixed bottom-6 right-6 z-50">
+  <div class="fixed bottom-4 right-4 z-50 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]">
     <!-- Chat Widget Expandido -->
     <Transition name="chat-expand">
       <div 
         v-if="isOpen" 
-        class="bg-base-100 rounded-2xl shadow-2xl border border-base-300 mb-4 overflow-hidden"
-        style="width: 400px; height: 600px;"
+        class="bg-base-100 rounded-2xl shadow-2xl border border-base-300 mb-4 overflow-hidden w-full sm:w-[400px] h-[600px] max-h-[calc(100vh-6rem)] flex flex-col"
       >
         <!-- Header -->
-        <div class="bg-primary text-primary-content p-4 flex items-center justify-between">
+        <div class="bg-primary text-primary-content p-4 flex items-center justify-between flex-shrink-0">
           <div class="flex items-center gap-3">
             <div class="avatar placeholder">
               <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
@@ -43,7 +42,7 @@
         </div>
 
         <!-- Messages Container -->
-        <div ref="messagesContainer" class="h-[calc(100%-140px)] overflow-y-auto p-4 space-y-3 bg-base-200/30">
+        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-3 bg-base-200/30" style="min-height: 0;">
           <!-- Welcome Message -->
           <div v-if="messages.length === 0" class="flex items-center justify-center h-full">
             <div class="text-center px-4">
@@ -111,7 +110,7 @@
         </div>
 
         <!-- Input Area -->
-        <div class="p-3 bg-base-100 border-t border-base-300">
+        <div class="p-3 bg-base-100 border-t border-base-300 flex-shrink-0">
           <div class="flex gap-2 items-end">
             <textarea 
               v-model="userMessage" 
