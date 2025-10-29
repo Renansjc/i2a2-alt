@@ -125,7 +125,7 @@ class NFeCrew:
             ],
             verbose=config.get('verbose', True),
             allow_delegation=config.get('allow_delegation', False),
-            max_iter=config.get('max_iter', 2),
+            max_iter=2,
             memory=False,
             llm=self._create_llm('sql_specialist')  # ✅ LLM from YAML
         )
@@ -158,7 +158,7 @@ class NFeCrew:
             tools=[],  # No tools - only formats responses
             verbose=config.get('verbose', True),
             allow_delegation=config.get('allow_delegation', False),
-            max_iter=config.get('max_iter', 2),
+            max_iter=2,
             memory=False,
             llm=self._create_llm('conversation_specialist')  # ✅ LLM from YAML
         )
@@ -202,7 +202,7 @@ class NFeCrew:
             backstory=config['backstory'],
             verbose=config.get('verbose', True),
             allow_delegation=True,
-            max_iter=3,
+            max_iter=2,
             memory=True,
             llm=self._create_llm('coordenador')  # ✅ LLM from YAML
         )

@@ -1,5 +1,27 @@
 <template>
-  <div class="h-screen flex flex-col bg-gradient-to-br from-base-100 to-base-200">
+  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-base-100 to-base-200 p-6">
+    <div class="text-center max-w-md">
+      <div class="text-6xl mb-6">💬</div>
+      <h1 class="text-3xl font-bold mb-4">Chat Movido!</h1>
+      <p class="text-lg text-base-content/70 mb-6">
+        O chat agora está disponível como um botão flutuante no canto inferior direito de todas as páginas.
+      </p>
+      <div class="flex flex-col gap-3">
+        <NuxtLink to="/" class="btn btn-primary btn-lg gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          Ir para Dashboard
+        </NuxtLink>
+        <p class="text-sm text-base-content/60">
+          Procure pelo botão azul com ícone de chat 💬
+        </p>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Old chat interface kept below for reference, hidden -->
+  <div class="hidden h-screen flex-col bg-gradient-to-br from-base-100 to-base-200">
     <!-- Header -->
     <div class="navbar bg-base-100 shadow-lg border-b border-base-300">
       <div class="flex-1">

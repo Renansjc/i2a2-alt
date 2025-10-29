@@ -81,7 +81,7 @@ coordenador:
   model: "gpt-4o-mini"
   verbose: true
   allow_delegation: false
-  temperature: 0.4
+  temperature: 0.2
 
 sql_specialist:
   role: >

@@ -13,48 +13,42 @@
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <div class="card bg-gradient-to-br from-primary to-primary-focus text-primary-content shadow-xl">
-        <div class="card-body">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="card-title text-sm opacity-80 uppercase tracking-wide">Total de Notas</h2>
-              <p class="text-4xl font-bold mt-2">{{ totalCount.toLocaleString('pt-BR') }}</p>
-              <p class="text-sm opacity-70 mt-1">Registros no sistema</p>
-            </div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div class="stats shadow-lg bg-primary">
+        <div class="stat text-primary-content">
+          <div class="stat-figure text-primary-content/30">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
+          <div class="stat-title text-primary-content/80 text-xs">Total de Notas</div>
+          <div class="stat-value text-3xl">{{ totalCount.toLocaleString('pt-BR') }}</div>
+          <div class="stat-desc text-primary-content/70">Registros no sistema</div>
         </div>
       </div>
       
-      <div class="card bg-gradient-to-br from-success to-success-focus text-success-content shadow-xl">
-        <div class="card-body">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="card-title text-sm opacity-80 uppercase tracking-wide">Valor Total</h2>
-              <p class="text-4xl font-bold mt-2">R$ {{ formatCurrency(totalValue) }}</p>
-              <p class="text-sm opacity-70 mt-1">Soma desta página</p>
-            </div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div class="stats shadow-lg bg-success">
+        <div class="stat text-success-content">
+          <div class="stat-figure text-success-content/30">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
+          <div class="stat-title text-success-content/80 text-xs">Valor Total</div>
+          <div class="stat-value text-2xl">R$ {{ formatCurrency(totalValue) }}</div>
+          <div class="stat-desc text-success-content/70">Soma desta página</div>
         </div>
       </div>
       
-      <div class="card bg-gradient-to-br from-info to-info-focus text-info-content shadow-xl">
-        <div class="card-body">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="card-title text-sm opacity-80 uppercase tracking-wide">Navegação</h2>
-              <p class="text-4xl font-bold mt-2">{{ currentPage + 1 }} / {{ totalPages }}</p>
-              <p class="text-sm opacity-70 mt-1">Páginas disponíveis</p>
-            </div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div class="stats shadow-lg bg-info">
+        <div class="stat text-info-content">
+          <div class="stat-figure text-info-content/30">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
           </div>
+          <div class="stat-title text-info-content/80 text-xs">Navegação</div>
+          <div class="stat-value text-3xl">{{ currentPage + 1 }} / {{ totalPages }}</div>
+          <div class="stat-desc text-info-content/70">Páginas disponíveis</div>
         </div>
       </div>
     </div>
@@ -115,7 +109,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="invoice in invoices" :key="invoice.chave_acesso" class="hover">
+              <tr v-for="invoice in invoices" :key="invoice.chave_acesso" class="hover cursor-pointer" @click="navigateTo(`/invoices/${invoice.id}`)">
                 <td class="font-semibold">{{ invoice.numero_nf }}</td>
                 <td>{{ invoice.serie }}</td>
                 <td>

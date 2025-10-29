@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-base-100">
     <div class="navbar bg-base-300">
       <div class="flex-1">
-        <a class="btn btn-ghost text-xl">Sistema NF-e</a>
+        <NuxtLink to="/" class="btn btn-ghost text-xl">Sistema NF-e</NuxtLink>
       </div>
       <div class="flex-none">
         <ul class="menu menu-horizontal px-1">
@@ -13,9 +13,11 @@
         </ul>
       </div>
     </div>
-    
     <main>
       <slot />
     </main>
+    
+    <!-- Floating Chat Widget -->
+    <FloatingChat />
   </div>
 </template>
