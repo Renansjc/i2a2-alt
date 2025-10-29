@@ -71,6 +71,23 @@ class SupabaseNFeImporter:
             response.raise_for_status()
             return response.json() if response.text else None
         
+        except requests.exceptions.HTTPError as e:
+            # Tratamento especial para erro 409 (Conflict)
+            if e.response.status_code == 409:
+                # Extrair informação sobre qual campo causou o conflito
+                error_msg = "Registro duplicado já existe no banco de dados"
+                if 'empresas' in endpoint:
+                    error_msg = "Empresa com este CPF/CNPJ já está cadastrada"
+                elif 'notas_fiscais' in endpoint:
+                    error_msg = "Nota fiscal com esta chave de acesso já foi importada"
+                raise Exception(error_msg)
+            
+            # Para outros erros HTTP, manter comportamento original
+            print(f"Erro na requisição: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"Resposta: {e.response.text}")
+            raise
+        
         except requests.exceptions.RequestException as e:
             print(f"Erro na requisição: {e}")
             if hasattr(e, 'response') and e.response is not None:

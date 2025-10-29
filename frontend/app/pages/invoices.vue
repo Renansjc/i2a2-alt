@@ -1,369 +1,296 @@
 <template>
-  <div class="space-y-6">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center">
-      <div>
-        <h1 class="text-3xl font-bold text-base-content">Notas Fiscais</h1>
-        <p class="text-base-content/70 mt-1">Gerencie e visualize todas as notas fiscais processadas</p>
-      </div>
-      
-      <div class="flex gap-3">
-        <button class="btn btn-outline btn-primary">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-          </svg>
-          Exportar
-        </button>
-        <button class="btn btn-primary" @click="refreshData">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-          </svg>
-          Atualizar
-        </button>
-      </div>
+  <div class="p-6 min-h-screen bg-gradient-to-br from-base-100 to-base-200">
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-4xl font-bold mb-2 flex items-center gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        Notas Fiscais
+      </h1>
+      <p class="text-base-content/60 text-lg">Visualize e gerencie todas as notas fiscais importadas</p>
     </div>
 
-    <!-- Filters and Search -->
-    <div class="card bg-base-100 shadow-sm border border-base-300">
-      <div class="card-body p-4">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Buscar</span>
-            </label>
-            <input 
-              type="text" 
-              placeholder="Número, CNPJ, razão social..." 
-              class="input input-bordered input-sm"
-              v-model="searchTerm"
-            />
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div class="card bg-gradient-to-br from-primary to-primary-focus text-primary-content shadow-xl">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="card-title text-sm opacity-80 uppercase tracking-wide">Total de Notas</h2>
+              <p class="text-4xl font-bold mt-2">{{ totalCount.toLocaleString('pt-BR') }}</p>
+              <p class="text-sm opacity-70 mt-1">Registros no sistema</p>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
           </div>
-          
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Tipo</span>
-            </label>
-            <select class="select select-bordered select-sm" v-model="filterType">
-              <option value="">Todos</option>
-              <option value="NFe">NF-e</option>
-              <option value="NFSe">NFS-e</option>
-            </select>
+        </div>
+      </div>
+      
+      <div class="card bg-gradient-to-br from-success to-success-focus text-success-content shadow-xl">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="card-title text-sm opacity-80 uppercase tracking-wide">Valor Total</h2>
+              <p class="text-4xl font-bold mt-2">R$ {{ formatCurrency(totalValue) }}</p>
+              <p class="text-sm opacity-70 mt-1">Soma desta página</p>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
-          
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Status</span>
-            </label>
-            <select class="select select-bordered select-sm" v-model="filterStatus">
-              <option value="">Todos</option>
-              <option value="processed">Processado</option>
-              <option value="pending">Pendente</option>
-              <option value="error">Erro</option>
-            </select>
-          </div>
-          
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Período</span>
-            </label>
-            <input 
-              type="date" 
-              class="input input-bordered input-sm"
-              v-model="dateFilter"
-            />
+        </div>
+      </div>
+      
+      <div class="card bg-gradient-to-br from-info to-info-focus text-info-content shadow-xl">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="card-title text-sm opacity-80 uppercase tracking-wide">Navegação</h2>
+              <p class="text-4xl font-bold mt-2">{{ currentPage + 1 }} / {{ totalPages }}</p>
+              <p class="text-sm opacity-70 mt-1">Páginas disponíveis</p>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- Invoices Table -->
-    <div class="card bg-base-100 shadow-sm border border-base-300">
+    
+    <!-- Loading State -->
+    <div v-if="loading" class="flex justify-center items-center py-20">
+      <div class="text-center">
+        <span class="loading loading-spinner loading-lg text-primary"></span>
+        <p class="mt-4 text-lg">Carregando notas fiscais...</p>
+      </div>
+    </div>
+    
+    <!-- Table -->
+    <div v-else class="card bg-base-100 shadow-2xl border border-base-300">
       <div class="card-body p-0">
         <div class="overflow-x-auto">
-          <table class="table table-zebra table-pin-rows">
-            <thead class="bg-base-200">
+          <table class="table">
+            <thead class="bg-gradient-to-r from-base-200 to-base-300">
               <tr>
-                <th class="w-12">
-                  <input type="checkbox" class="checkbox checkbox-sm" @change="toggleSelectAll" />
+                <th class="w-20 cursor-pointer hover:bg-base-300" @click="sortBy('numero_nf')">
+                  <div class="flex items-center gap-1">
+                    Número
+                    <span class="text-xs opacity-60">{{ getSortIcon('numero_nf') }}</span>
+                  </div>
                 </th>
-                <th class="font-semibold">Número</th>
-                <th class="font-semibold">Tipo</th>
-                <th class="font-semibold">Emitente</th>
-                <th class="font-semibold">CNPJ</th>
-                <th class="font-semibold">Data Emissão</th>
-                <th class="font-semibold">Valor Total</th>
-                <th class="font-semibold">Status</th>
-                <th class="font-semibold text-center">Ações</th>
+                <th class="w-16 cursor-pointer hover:bg-base-300" @click="sortBy('serie')">
+                  <div class="flex items-center gap-1">
+                    Série
+                    <span class="text-xs opacity-60">{{ getSortIcon('serie') }}</span>
+                  </div>
+                </th>
+                <th>Emissor</th>
+                <th>Destinatário</th>
+                <th class="cursor-pointer hover:bg-base-300" @click="sortBy('natureza_operacao')">
+                  <div class="flex items-center gap-1">
+                    Natureza
+                    <span class="text-xs opacity-60">{{ getSortIcon('natureza_operacao') }}</span>
+                  </div>
+                </th>
+                <th class="w-32 cursor-pointer hover:bg-base-300" @click="sortBy('valor_total_nota')">
+                  <div class="flex items-center gap-1">
+                    Valor Total
+                    <span class="text-xs opacity-60">{{ getSortIcon('valor_total_nota') }}</span>
+                  </div>
+                </th>
+                <th class="w-32 cursor-pointer hover:bg-base-300" @click="sortBy('data_hora_emissao')">
+                  <div class="flex items-center gap-1">
+                    Data Emissão
+                    <span class="text-xs opacity-60">{{ getSortIcon('data_hora_emissao') }}</span>
+                  </div>
+                </th>
+                <th class="w-24 cursor-pointer hover:bg-base-300" @click="sortBy('status')">
+                  <div class="flex items-center gap-1">
+                    Status
+                    <span class="text-xs opacity-60">{{ getSortIcon('status') }}</span>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="invoice in filteredInvoices" :key="invoice.id" class="hover">
+              <tr v-for="invoice in invoices" :key="invoice.chave_acesso" class="hover">
+                <td class="font-semibold">{{ invoice.numero_nf }}</td>
+                <td>{{ invoice.serie }}</td>
                 <td>
-                  <input 
-                    type="checkbox" 
-                    class="checkbox checkbox-sm" 
-                    v-model="selectedInvoices"
-                    :value="invoice.id"
-                  />
+                  <span class="font-medium">{{ truncate(getEmpresaName(invoice.emitente), 35) }}</span>
                 </td>
-                <td class="font-mono text-sm">{{ invoice.number }}</td>
                 <td>
-                  <div class="badge badge-outline badge-sm">{{ invoice.type }}</div>
+                  <span class="font-medium">{{ truncate(getEmpresaName(invoice.destinatario), 35) }}</span>
                 </td>
-                <td class="max-w-xs truncate">{{ invoice.issuer }}</td>
-                <td class="font-mono text-sm">{{ formatCNPJ(invoice.cnpj) }}</td>
-                <td class="text-sm">{{ formatDate(invoice.issueDate) }}</td>
-                <td class="font-semibold">{{ formatCurrency(invoice.totalValue) }}</td>
                 <td>
-                  <div :class="getStatusBadgeClass(invoice.status)">
-                    {{ getStatusText(invoice.status) }}
+                  <span class="text-sm">{{ truncate(invoice.natureza_operacao, 25) }}</span>
+                </td>
+                <td>
+                  <span class="font-bold text-success">R$ {{ formatCurrency(invoice.valor_total_nota) }}</span>
+                </td>
+                <td>
+                  <div class="flex flex-col">
+                    <span class="text-sm">{{ formatDate(invoice.data_hora_emissao) }}</span>
+                    <span class="text-xs text-base-content/60">{{ formatTime(invoice.data_hora_emissao) }}</span>
                   </div>
                 </td>
                 <td>
-                  <div class="flex justify-center gap-1">
-                    <button 
-                      class="btn btn-ghost btn-xs tooltip" 
-                      data-tip="Visualizar"
-                      @click="viewInvoice(invoice)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                      </svg>
-                    </button>
-                    <button 
-                      class="btn btn-ghost btn-xs tooltip" 
-                      data-tip="Editar"
-                      @click="editInvoice(invoice)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                      </svg>
-                    </button>
-                    <button 
-                      class="btn btn-ghost btn-xs text-error tooltip" 
-                      data-tip="Excluir"
-                      @click="deleteInvoice(invoice)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                      </svg>
-                    </button>
-                  </div>
+                  <span :class="getStatusBadgeClass(invoice.status)" class="badge badge-sm">
+                    {{ formatStatus(invoice.status) }}
+                  </span>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        
-        <!-- Pagination -->
-        <div class="flex justify-between items-center p-4 border-t border-base-300">
-          <div class="text-sm text-base-content/70">
-            Mostrando {{ startIndex + 1 }} a {{ endIndex }} de {{ totalInvoices }} registros
-          </div>
-          <div class="join">
-            <button class="join-item btn btn-sm" :disabled="currentPage === 1" @click="previousPage">
-              «
-            </button>
-            <button class="join-item btn btn-sm btn-active">
-              Página {{ currentPage }}
-            </button>
-            <button class="join-item btn btn-sm" :disabled="currentPage === totalPages" @click="nextPage">
-              »
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Bulk Actions -->
-    <div v-if="selectedInvoices.length > 0" class="fixed bottom-6 right-6">
-      <div class="card bg-primary text-primary-content shadow-lg">
-        <div class="card-body p-4">
-          <div class="flex items-center gap-4">
-            <span class="text-sm">{{ selectedInvoices.length }} selecionados</span>
-            <div class="flex gap-2">
-              <button class="btn btn-sm btn-ghost" @click="bulkExport">
-                Exportar
-              </button>
-              <button class="btn btn-sm btn-error" @click="bulkDelete">
-                Excluir
-              </button>
-            </div>
+        <!-- Pagination -->
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 p-6 bg-base-200 border-t border-base-300">
+          <button 
+            @click="previousPage" 
+            class="btn btn-outline gap-2"
+            :disabled="currentPage === 0"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            Anterior
+          </button>
+          
+          <div class="flex flex-col items-center gap-1">
+            <span class="text-lg font-bold">Página {{ currentPage + 1 }} de {{ totalPages }}</span>
+            <span class="text-sm text-base-content/60">{{ totalCount.toLocaleString('pt-BR') }} registros totais</span>
           </div>
+          
+          <button 
+            @click="nextPage" 
+            class="btn btn-outline gap-2"
+            :disabled="currentPage >= totalPages - 1"
+          >
+            Próxima
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
 
-<script setup lang="ts">
-// Page metadata
-definePageMeta({
-  title: 'Notas Fiscais'
+<script setup>
+const { getInvoices } = useSupabase()
+const loading = ref(true)
+const invoices = ref([])
+const currentPage = ref(0)
+const totalCount = ref(0)
+const pageSize = 50
+const sortColumn = ref('data_hora_emissao')
+const sortDirection = ref('desc')
+
+const totalPages = computed(() => Math.ceil(totalCount.value / pageSize))
+
+const totalValue = computed(() => {
+  return invoices.value.reduce((sum, invoice) => sum + (invoice.valor_total_nota || 0), 0)
 })
 
-// Reactive data
-const searchTerm = ref('')
-const filterType = ref('')
-const filterStatus = ref('')
-const dateFilter = ref('')
-const selectedInvoices = ref<string[]>([])
-const currentPage = ref(1)
-const itemsPerPage = 20
-
-// Mock data - replace with actual API calls
-const invoices = ref([
-  {
-    id: '1',
-    number: '000000001',
-    type: 'NFe',
-    issuer: 'Empresa ABC Ltda',
-    cnpj: '12345678000195',
-    issueDate: '2024-01-15',
-    totalValue: 1250.50,
-    status: 'processed'
-  },
-  {
-    id: '2',
-    number: '000000002',
-    type: 'NFSe',
-    issuer: 'Prestadora XYZ S/A',
-    cnpj: '98765432000123',
-    issueDate: '2024-01-16',
-    totalValue: 850.00,
-    status: 'pending'
-  },
-  {
-    id: '3',
-    number: '000000003',
-    type: 'NFe',
-    issuer: 'Fornecedor 123 Eireli',
-    cnpj: '11223344000156',
-    issueDate: '2024-01-17',
-    totalValue: 2100.75,
-    status: 'error'
+const loadInvoices = async () => {
+  loading.value = true
+  try {
+    const { data, count } = await getInvoices(currentPage.value, pageSize, sortColumn.value, sortDirection.value)
+    invoices.value = data
+    totalCount.value = count
+  } catch (error) {
+    alert('Erro ao carregar notas fiscais')
+  } finally {
+    loading.value = false
   }
-])
-
-// Computed properties
-const filteredInvoices = computed(() => {
-  let filtered = invoices.value
-
-  if (searchTerm.value) {
-    const search = searchTerm.value.toLowerCase()
-    filtered = filtered.filter(invoice => 
-      invoice.number.toLowerCase().includes(search) ||
-      invoice.issuer.toLowerCase().includes(search) ||
-      invoice.cnpj.includes(search)
-    )
-  }
-
-  if (filterType.value) {
-    filtered = filtered.filter(invoice => invoice.type === filterType.value)
-  }
-
-  if (filterStatus.value) {
-    filtered = filtered.filter(invoice => invoice.status === filterStatus.value)
-  }
-
-  if (dateFilter.value) {
-    filtered = filtered.filter(invoice => invoice.issueDate === dateFilter.value)
-  }
-
-  return filtered
-})
-
-const totalInvoices = computed(() => filteredInvoices.value.length)
-const totalPages = computed(() => Math.ceil(totalInvoices.value / itemsPerPage))
-const startIndex = computed(() => (currentPage.value - 1) * itemsPerPage)
-const endIndex = computed(() => Math.min(startIndex.value + itemsPerPage, totalInvoices.value))
-
-// Methods
-const formatCNPJ = (cnpj: string) => {
-  return cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
 }
 
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('pt-BR')
-}
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(value)
-}
-
-const getStatusBadgeClass = (status: string) => {
-  const classes = {
-    processed: 'badge badge-success badge-sm',
-    pending: 'badge badge-warning badge-sm',
-    error: 'badge badge-error badge-sm'
-  }
-  return classes[status as keyof typeof classes] || 'badge badge-ghost badge-sm'
-}
-
-const getStatusText = (status: string) => {
-  const texts = {
-    processed: 'Processado',
-    pending: 'Pendente',
-    error: 'Erro'
-  }
-  return texts[status as keyof typeof texts] || status
-}
-
-const toggleSelectAll = (event: Event) => {
-  const target = event.target as HTMLInputElement
-  if (target.checked) {
-    selectedInvoices.value = filteredInvoices.value.map(invoice => invoice.id)
+const sortBy = (column) => {
+  if (sortColumn.value === column) {
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
   } else {
-    selectedInvoices.value = []
+    sortColumn.value = column
+    sortDirection.value = 'asc'
   }
+  currentPage.value = 0
+  loadInvoices()
 }
 
-const viewInvoice = (invoice: any) => {
-  // Navigate to invoice detail page
-  navigateTo(`/invoices/${invoice.id}`)
-}
-
-const editInvoice = (invoice: any) => {
-  // Navigate to invoice edit page
-  navigateTo(`/invoices/${invoice.id}/edit`)
-}
-
-const deleteInvoice = (invoice: any) => {
-  if (confirm(`Tem certeza que deseja excluir a nota fiscal ${invoice.number}?`)) {
-    // API call to delete invoice
-    console.log('Deleting invoice:', invoice.id)
-  }
-}
-
-const bulkExport = () => {
-  console.log('Exporting invoices:', selectedInvoices.value)
-}
-
-const bulkDelete = () => {
-  if (confirm(`Tem certeza que deseja excluir ${selectedInvoices.value.length} notas fiscais?`)) {
-    console.log('Bulk deleting invoices:', selectedInvoices.value)
-    selectedInvoices.value = []
-  }
-}
-
-const refreshData = () => {
-  // API call to refresh data
-  console.log('Refreshing invoice data...')
-}
-
-const previousPage = () => {
-  if (currentPage.value > 1) {
-    currentPage.value--
-  }
+const getSortIcon = (column) => {
+  if (sortColumn.value !== column) return '↕'
+  return sortDirection.value === 'asc' ? '↑' : '↓'
 }
 
 const nextPage = () => {
-  if (currentPage.value < totalPages.value) {
-    currentPage.value++
-  }
+  currentPage.value++
+  loadInvoices()
 }
+
+const previousPage = () => {
+  currentPage.value--
+  loadInvoices()
+}
+
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value || 0)
+}
+
+const formatDate = (date) => {
+  if (!date) return '-'
+  return new Date(date).toLocaleDateString('pt-BR')
+}
+
+const formatTime = (date) => {
+  if (!date) return '-'
+  return new Date(date).toLocaleTimeString('pt-BR', { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  })
+}
+
+const formatStatus = (status) => {
+  const statusMap = {
+    'emitida': 'Emitida',
+    'autorizada': 'Autorizada',
+    'cancelada': 'Cancelada',
+    'denegada': 'Denegada',
+    'rejeitada': 'Rejeitada',
+    'inutilizada': 'Inutilizada'
+  }
+  return statusMap[status] || status
+}
+
+const getStatusBadgeClass = (status) => {
+  const classMap = {
+    'emitida': 'badge-info',
+    'autorizada': 'badge-success',
+    'cancelada': 'badge-error',
+    'denegada': 'badge-warning',
+    'rejeitada': 'badge-error',
+    'inutilizada': 'badge-ghost'
+  }
+  return classMap[status] || 'badge-ghost'
+}
+
+const truncate = (text, maxLength) => {
+  if (!text) return '-'
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength) + '...'
+}
+
+const getEmpresaName = (empresa) => {
+  if (!empresa) return null
+  return empresa.nome_fantasia || empresa.razao_social || null
+}
+
+onMounted(() => {
+  loadInvoices()
+})
 </script>

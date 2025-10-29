@@ -12,10 +12,13 @@ Requirements satisfied:
 - 1.5: Generate report with successes and failures
 """
 
-from fastapi import APIRouter, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, HTTPException, status, BackgroundTasks, UploadFile, File
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 import asyncio
+import tempfile
+import shutil
+from pathlib import Path
 
 from api.models.requests import BatchUploadRequest
 from api.models.responses import (
@@ -78,12 +81,17 @@ async def _run_batch_processing(
         folder_path: Path to folder containing XML files
         max_concurrent: Optional max concurrent uploads
     """
+    temp_dir = None
     try:
         logger.info(
             "background_batch_processing_started",
             job_id=job_id,
             folder_path=folder_path
         )
+        
+        # Check if this is a temp directory (uploaded files)
+        if folder_path.startswith(tempfile.gettempdir()):
+            temp_dir = folder_path
         
         # Create processor with custom concurrency if specified
         processor = batch_processor
@@ -95,6 +103,29 @@ async def _run_batch_processing(
             folder_path=folder_path,
             job_id=job_id
         )
+        
+        # Update job manager with final results
+        job = job_manager.get_job(job_id)
+        if job:
+            job.update_progress(
+                processed=result.get("processed", 0),
+                successful=result.get("successful", 0),
+                failed=result.get("failed", 0)
+            )
+            
+            # Add errors to job
+            for error in result.get("errors", []):
+                job.add_error(
+                    file_name=error.get("file", "unknown"),
+                    error_message=error.get("error", "Unknown error"),
+                    error_type=error.get("error_type")
+                )
+            
+            # Mark job as complete or failed
+            if result.get("status") == "completed":
+                job.complete()
+            else:
+                job.fail(f"Processing failed with {result.get('failed', 0)} errors")
         
         logger.info(
             "background_batch_processing_completed",
@@ -109,6 +140,27 @@ async def _run_batch_processing(
             e,
             job_id=job_id
         )
+        
+        # Mark job as failed in job manager
+        job = job_manager.get_job(job_id)
+        if job:
+            job.fail(str(e))
+            
+    finally:
+        # Clean up temp directory if it was created for uploaded files
+        if temp_dir and Path(temp_dir).exists():
+            try:
+                shutil.rmtree(temp_dir)
+                logger.info(
+                    "temp_directory_cleaned",
+                    temp_dir=temp_dir
+                )
+            except Exception as e:
+                logger.warning(
+                    "temp_directory_cleanup_failed",
+                    temp_dir=temp_dir,
+                    error=str(e)
+                )
 
 
 @router.post(
@@ -117,21 +169,22 @@ async def _run_batch_processing(
     status_code=status.HTTP_202_ACCEPTED,
     summary="Start batch XML processing",
     description="""
-    Start processing multiple NF-e XML files from a specified folder.
+    Start processing multiple NF-e XML files uploaded by the user.
     
     The system will:
-    1. Locate all XML files in the specified folder
-    2. Process each file using the existing import logic from db.py
-    3. Track successes and failures
-    4. Continue processing even if individual files fail
-    5. Generate a comprehensive report
+    1. Receive XML files from the client
+    2. Save them temporarily
+    3. Process each file using the existing import logic from db.py
+    4. Track successes and failures
+    5. Continue processing even if individual files fail
+    6. Generate a comprehensive report
     
     Processing happens asynchronously in the background. Use the returned
     job_id to check the status via GET /api/batch/status/{job_id}.
     
     Requirements:
     - 7.5: REST API endpoint for batch upload
-    - 1.1: Process multiple XML files from folder
+    - 1.1: Process multiple XML files
     - 1.2: Uses existing SupabaseNFeImporter logic
     - 1.3: Records successful imports
     - 1.4: Records errors and continues processing
@@ -156,22 +209,22 @@ async def _run_batch_processing(
                 }
             }
         },
-        400: {"description": "Invalid request data or folder not found"},
+        400: {"description": "Invalid request data or no files provided"},
         500: {"description": "Internal server error"}
     }
 )
 async def start_batch_upload(
-    request: BatchUploadRequest,
-    background_tasks: BackgroundTasks
+    files: List[UploadFile] = File(...),
+    background_tasks: BackgroundTasks = None
 ) -> BatchUploadResponse:
-    """Start batch processing of XML files
+    """Start batch processing of uploaded XML files
     
     Requirements:
     - 7.5: REST API endpoint for batch upload
-    - 1.1: Process multiple XML files from xml_nf folder
+    - 1.1: Process multiple XML files
     
     Args:
-        request: BatchUploadRequest with folder path and options
+        files: List of uploaded XML files
         background_tasks: FastAPI background tasks manager
         
     Returns:
@@ -188,54 +241,56 @@ async def start_batch_upload(
             detail="Batch services not initialized"
         )
     
+    # Validate files
+    if not files:
+        logger.warning("batch_no_files_uploaded")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No files provided"
+        )
+    
+    total_files = len(files)
     logger.info(
         "batch_upload_request_received",
-        folder_path=request.xml_folder,
-        max_concurrent=request.max_concurrent
+        total_files=total_files
     )
     
     try:
-        # Create processor with custom concurrency if specified
-        processor = batch_processor
-        if request.max_concurrent is not None:
-            processor = BatchProcessor(max_concurrent=request.max_concurrent)
-            logger.debug(
-                "custom_processor_created",
-                max_concurrent=request.max_concurrent
-            )
+        # Create temporary directory for uploaded files
+        temp_dir = tempfile.mkdtemp(prefix="nfe_upload_")
+        temp_path = Path(temp_dir)
         
-        # Validate folder exists and count files (synchronous check)
-        from pathlib import Path
-        folder = Path(request.xml_folder)
+        logger.info(
+            "temp_directory_created",
+            temp_dir=temp_dir
+        )
         
-        if not folder.exists():
-            logger.warning(
-                "batch_folder_not_found",
-                folder_path=request.xml_folder
-            )
-            raise ValidationException(
-                message=f"Folder not found: {request.xml_folder}",
-                details={"folder_path": request.xml_folder}
-            )
+        # Save uploaded files to temp directory
+        saved_files = 0
+        for file in files:
+            if file.filename.lower().endswith('.xml'):
+                file_path = temp_path / file.filename
+                with open(file_path, 'wb') as f:
+                    content = await file.read()
+                    f.write(content)
+                saved_files += 1
+                logger.debug(
+                    "file_saved",
+                    filename=file.filename,
+                    size=len(content)
+                )
         
-        # Count XML files
-        xml_files = list(folder.glob("*.xml")) + list(folder.glob("*.XML"))
-        total_files = len(xml_files)
-        
-        if total_files == 0:
-            logger.warning(
-                "batch_no_files_found",
-                folder_path=request.xml_folder
-            )
-            raise ValidationException(
-                message=f"No XML files found in folder: {request.xml_folder}",
-                details={"folder_path": request.xml_folder}
+        if saved_files == 0:
+            logger.warning("batch_no_xml_files")
+            shutil.rmtree(temp_dir)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No valid XML files provided"
             )
         
         logger.info(
-            "batch_files_counted",
-            folder_path=request.xml_folder,
-            total_files=total_files
+            "batch_files_saved",
+            saved_files=saved_files
         )
         
         # Create job in job manager
@@ -244,8 +299,8 @@ async def start_batch_upload(
         
         job = job_manager.create_job(
             job_id=job_id,
-            folder_path=request.xml_folder,
-            total_files=total_files
+            folder_path=temp_dir,
+            total_files=saved_files
         )
         
         # Start job
@@ -254,22 +309,22 @@ async def start_batch_upload(
         logger.info(
             "batch_job_created",
             job_id=job_id,
-            total_files=total_files
+            total_files=saved_files
         )
         
         # Schedule background processing
         background_tasks.add_task(
             _run_batch_processing,
             job_id=job_id,
-            folder_path=request.xml_folder,
-            max_concurrent=request.max_concurrent
+            folder_path=temp_dir,
+            max_concurrent=5
         )
         
         # Return initial response
         response = BatchUploadResponse(
             job_id=job_id,
             status=BatchJobStatus.RUNNING,
-            total_files=total_files,
+            total_files=saved_files,
             successful=0,
             failed=0,
             errors=[],
@@ -281,25 +336,14 @@ async def start_batch_upload(
         logger.info(
             "batch_upload_started",
             job_id=job_id,
-            total_files=total_files
+            total_files=saved_files
         )
         
         return response
         
-    except ValidationException:
-        # Re-raise validation exceptions
+    except HTTPException:
+        # Re-raise HTTP exceptions
         raise
-        
-    except BatchProcessingException as e:
-        logger.error(
-            "batch_processing_exception",
-            error=str(e),
-            details=e.details
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
         
     except Exception as e:
         logger.exception(
@@ -398,7 +442,7 @@ async def get_batch_status(job_id: str) -> BatchStatusResponse:
             # Convert processor status to response format
             total = processor_status.get("total", 0)
             processed = processor_status.get("processed", 0)
-            progress = int((processed / total * 100) if total > 0 else 0)
+            progress = min(100, int((processed / total * 100) if total > 0 else 0))
             
             # Parse status
             status_str = processor_status.get("status", "unknown")
@@ -445,7 +489,7 @@ async def get_batch_status(job_id: str) -> BatchStatusResponse:
             # Convert job manager data to response format
             total = job_data.get("total_files", 0)
             processed = job_data.get("processed_files", 0)
-            progress = int(job_data.get("progress_percentage", 0))
+            progress = min(100, int(job_data.get("progress_percentage", 0)))
             
             # Parse status
             status_str = job_data.get("status", "unknown")

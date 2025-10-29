@@ -203,7 +203,7 @@ class NFeCrew:
             verbose=config.get('verbose', True),
             allow_delegation=True,
             max_iter=3,
-            memory=False,
+            memory=True,
             llm=self._create_llm('coordenador')  # ✅ LLM from YAML
         )
     
@@ -358,7 +358,7 @@ class NFeCrew:
             process=Process.sequential,  # Sequential execution
             #manager_agent=self.coordenador(),
             verbose=True,  # Enable detailed logging
-            memory=False,  # Disabled for performance (was causing 10s+ delays)
+            memory=True,  # Disabled for performance (was causing 10s+ delays)
         )
     
     def process_message(

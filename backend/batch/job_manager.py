@@ -143,7 +143,6 @@ class BatchJob:
         }
         
         self.errors.append(error_detail)
-        self.failed_files += 1
     
     @property
     def progress_percentage(self) -> float:
