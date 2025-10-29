@@ -5,18 +5,18 @@ This module implements the CrewAI-based multi-agent system for processing
 electronic invoices (NF-e) and answering user queries through natural language.
 
 The system consists of three specialized agents:
-1. Coordinator: Analyzes user intent and delegates tasks
+1. coordenador: Analyzes user intent and delegates tasks
 2. SQL Specialist: Generates and executes database queries
 3. Conversation Specialist: Formats responses in natural language
 
 Architecture:
-- Uses CrewAI's hierarchical process with coordinator as manager
-- Integrates with Supabase database via REST API tools
-- Maintains conversation context through CrewAI's built-in memory
+- Uses CrewAI's sequential process with coordenador managing flow
+- Integrates with PostgreSQL database via direct SQL queries
+- Maintains conversation context through task inputs
 - Supports both database queries and conversational interactions
 """
 
-from crewai import Agent, Crew, Task, Process
+from crewai import Agent, Crew, Task, Process, LLM
 from crewai.project import CrewBase, agent, crew, task
 from typing import Dict, Any, List, Optional
 import yaml
@@ -39,8 +39,8 @@ class NFeCrew:
     - Format responses in natural, friendly language
     - Maintain conversation context across interactions
     
-    The crew uses a hierarchical process where the coordinator agent
-    acts as a manager, delegating tasks to specialized agents.
+    The crew uses a sequential process where the coordenador agent
+    manages the flow and can delegate to specialized agents.
     
     Usage:
         crew = NFeCrew()
@@ -66,10 +66,30 @@ class NFeCrew:
         
         # Initialize tools
         self.sql_tool = SQLQueryTool()  # Direct SQL - most powerful
-        self.db_tool = DatabaseQueryTool()  # REST API fallback
-        self.db_join_tool = DatabaseJoinQueryTool()  # REST API with joins
+        self.db_tool = DatabaseQueryTool()  # REST API fallback (not used)
+        self.db_join_tool = DatabaseJoinQueryTool()  # REST API with joins (not used)
         self.schema_tool = SchemaInfoTool()
         self.schema_search_tool = SchemaSearchTool()
+    
+    def _create_llm(self, agent_name: str) -> LLM:
+        """
+        Cria LLM com configurações do YAML.
+        
+        Centraliza a criação de LLM para todos os agentes,
+        usando model e temperature definidos em agents.yaml.
+        
+        Args:
+            agent_name: Nome do agente no YAML (sql_specialist, coordenador, etc.)
+        
+        Returns:
+            LLM: Instância configurada do LLM
+        """
+        config = self.agents_config[agent_name]
+        
+        return LLM(
+            model=config.get('model', 'gpt-4o-mini'),
+            temperature=config.get('temperature', 0.1)
+        )
     
     @agent
     def sql_specialist(self) -> Agent:
@@ -79,28 +99,35 @@ class NFeCrew:
         Responsible for:
         - Understanding user queries that require database access
         - Generating optimized SQL queries
-        - Executing queries via DatabaseQueryTool
+        - Executing queries via SQLQueryTool (direct PostgreSQL)
         - Returning structured results
         
         Tools:
-        - DatabaseQueryTool: Execute SELECT queries via Supabase REST API
-        - DatabaseJoinQueryTool: Execute complex queries with JOINs
+        - SQLQueryTool: Execute SELECT queries directly on PostgreSQL
         - SchemaInfoTool: Get database schema information
         - SchemaSearchTool: Search for relevant tables/columns
+        
+        Configuration:
+        - Model and temperature loaded from agents.yaml
+        - allow_delegation=False: Does not delegate
+        - max_iter=2: Limited iterations to prevent loops
         """
+        config = self.agents_config['sql_specialist']
+        
         return Agent(
-            role=self.agents_config['sql_specialist']['role'],
-            goal=self.agents_config['sql_specialist']['goal'],
-            backstory=self.agents_config['sql_specialist']['backstory'],
+            role=config['role'],
+            goal=config['goal'],
+            backstory=config['backstory'],
             tools=[
                 self.sql_tool,  # Primary: Direct SQL queries
                 self.schema_tool,
                 self.schema_search_tool
             ],
-            verbose=True,
-            allow_delegation=False,  # SQL specialist doesn't delegate
-            max_iter=7,  # REDUZIDO: Evita loops (era 15)
-            memory=False  # DESABILITADO: Memory muito lenta
+            verbose=config.get('verbose', True),
+            allow_delegation=config.get('allow_delegation', False),
+            max_iter=config.get('max_iter', 2),
+            memory=False,
+            llm=self._create_llm('sql_specialist')  # ✅ LLM from YAML
         )
     
     @agent
@@ -114,63 +141,80 @@ class NFeCrew:
         - Maintaining friendly and professional tone
         - Formatting monetary values and numbers appropriately
         
-        This agent does not have database tools - it only formats
-        information provided by other agents or responds to general queries.
+        Tools:
+        - None: Only formats responses, does not execute queries
+        
+        Configuration:
+        - Model and temperature loaded from agents.yaml
+        - allow_delegation=False: Does not delegate
+        - max_iter=2: Limited iterations to prevent loops
         """
+        config = self.agents_config['conversation_specialist']
+        
         return Agent(
-            role=self.agents_config['conversation_specialist']['role'],
-            goal=self.agents_config['conversation_specialist']['goal'],
-            backstory=self.agents_config['conversation_specialist']['backstory'],
+            role=config['role'],
+            goal=config['goal'],
+            backstory=config['backstory'],
             tools=[],  # No tools - only formats responses
-            verbose=True,
-            allow_delegation=False,  # Conversation specialist doesn't delegate
-            max_iter=3,  # REDUZIDO: Evita loops (era 10)
-            memory=False  # DESABILITADO: Memory muito lenta
+            verbose=config.get('verbose', True),
+            allow_delegation=config.get('allow_delegation', False),
+            max_iter=config.get('max_iter', 2),
+            memory=False,
+            llm=self._create_llm('conversation_specialist')  # ✅ LLM from YAML
         )
     
     @agent
-    def coordinator(self) -> Agent:
+    def coordenador(self) -> Agent:
         """
-        Coordinator Agent
+        coordenador Agent
         
         Responsible for:
         - Analyzing user message intent
         - Deciding which agent should handle the request
-        - Delegating tasks to specialized agents
+        - Delegating tasks to specialized agents (if allow_delegation=True)
         - Coordinating the overall response flow
         
-        Has access to all tools to handle requests directly or delegate.
+        Tools:
+        - SchemaInfoTool: Understand database structure
+        - SchemaSearchTool: Search for tables/columns
+        - NO SQLQueryTool: Does not execute SQL (delegates to specialist)
+        
+        Configuration:
+        - Model and temperature loaded from agents.yaml
+        - allow_delegation: Configurable (False for all-in-one, True for hybrid)
+        - max_iter=2: Limited iterations to prevent loops
+        
+        Architecture Options:
+        1. All-in-One (allow_delegation=False): coordenador does everything
+           - Fastest: ~3-5s
+           - Less modular
+        
+        2. Hybrid (allow_delegation=True): coordenador delegates SQL to specialist
+           - Moderate: ~10-15s
+           - More modular
+           - coordenador uses schema tools, SQL specialist executes queries
         """
+        config = self.agents_config['coordenador']
+        
         return Agent(
-            role=self.agents_config['coordinator']['role'],
-            goal=self.agents_config['coordinator']['goal'],
-            backstory=self.agents_config['coordinator']['backstory'],
-            tools=[
-                self.sql_tool,  # Primary: Direct SQL queries
-                self.schema_tool,
-                self.schema_search_tool
-            ],  # Coordinator has all tools available
-            verbose=True,
-            allow_delegation=True,  # Can delegate to other agents
-            max_iter=5,  # REDUZIDO: Evita loops infinitos (era 25)
-            memory=False  # DESABILITADO: Memory muito lenta
+            role=config['role'],
+            goal=config['goal'],
+            backstory=config['backstory'],
+            verbose=config.get('verbose', True),
+            allow_delegation=True,
+            max_iter=3,
+            memory=False,
+            llm=self._create_llm('coordenador')  # ✅ LLM from YAML
         )
     
     @task
     def process_user_message_task(self) -> Task:
         """
-        Task: Process user message
+        Task: Process user message - HIERARCHICAL VERSION
         
-        This is the main task that processes the user's message.
-        The coordinator handles the request directly or delegates as needed.
-        
-        Inputs:
-        - message: User's message
-        - chat_history: Previous conversation context
-        - database_schema: Database schema information
-        
-        Output:
-        - Complete response to the user's message
+        Manager (coordenador) analyzes and delegates to workers.
+        Workers execute and return results.
+        Manager coordinates final response.
         """
         return Task(
             description="""
@@ -179,41 +223,50 @@ class NFeCrew:
             Contexto: {chat_history}
             Schema disponível: {database_schema}
             
-            INSTRUÇÕES CRÍTICAS:
+            ════════════════════════════════════════════════════════════
+            ⚠️ VOCÊ É O MANAGER - DELEGUE, NÃO EXECUTE!
+            ════════════════════════════════════════════════════════════
             
-            1. Para perguntas sobre DADOS (valores, quantidades, empresas, produtos):
-               ⚠️ SEMPRE execute uma query SQL - NUNCA use informações da memória!
-               ⚠️ Dados podem ter mudado - sempre consulte o banco atual!
-               
-               - Use SQL Query Tool para consultar o banco diretamente
-               - Escreva uma query SQL SELECT completa em PostgreSQL
-               - Exemplos:
-                 * Contar: SELECT COUNT(*) as total FROM notas_fiscais
-                 * Contar com filtro: SELECT COUNT(*) as total FROM notas_fiscais WHERE status = 'autorizada'
-                 * Somar: SELECT SUM(valor_total_nota) as total FROM notas_fiscais
-                 * JOIN: SELECT e.razao_social, COUNT(nf.id) FROM empresas e JOIN notas_fiscais nf ON e.id = nf.emitente_id GROUP BY e.razao_social
-               - Execute a query e formate a resposta em linguagem natural
+            Para perguntas sobre DADOS:
+            → DELEGUE para "sql_specialist"
+            → Use "Delegate work to coworker"
+            → Forneça contexto COMPLETO: tabelas, colunas, filtros, agregações
             
-            2. Para perguntas CONVERSACIONAIS (saudação, explicação, ajuda):
-               - Responda diretamente de forma amigável
-               - Explique como o sistema funciona se perguntado
-               - Ofereça ajuda adicional
+            Para FORMATAÇÃO:
+            → DELEGUE para "comunication_specialist"
+            → Use "Delegate work to coworker"
+            → Forneça dados brutos a formatar
             
-            3. REGRA DE OURO:
-               - Se a pergunta menciona números, valores, quantidades → EXECUTE SQL
-               - NUNCA responda com dados da memória
-               - Sempre responda em português brasileiro
-               - Use formatação R$ para valores monetários
-               - Seja claro, preciso e amigável
+            Para CONVERSAÇÃO:
+            → DELEGUE para "comunication_specialist"
+            → Use "Delegate work to coworker"
+            
+            ⚠️ NUNCA:
+            - Execute SQL você mesmo
+            - Use "Ask question to coworker"
+            - Delegue para "Coordenador"
+            
+            ✅ SEMPRE:
+            - Use "Delegate work to coworker"
+            - Forneça contexto completo
+            - Use nomes EXATOS dos workers acima
+            
+            FORMATO CORRETO:
+            Action: Delegate work to coworker
+            Action Input: {
+            "task": "[tarefa específica]",
+            "context": "[TODO contexto necessário]",
+            "coworker": "[nome EXATO do worker]"
+            }
             """,
             expected_output="""
-            Uma resposta completa em português que:
-            - Responde diretamente à pergunta
-            - Usa linguagem natural e amigável
+            Resposta completa em português brasileiro que:
+            - Responde à pergunta
+            - Foi construída delegando aos workers
+            - Usa linguagem natural
             - Formata valores corretamente (R$)
-            - É precisa e útil
             """,
-            agent=self.coordinator()
+            agent=self.coordenador()
         )
     
     @task
@@ -221,7 +274,7 @@ class NFeCrew:
         """
         Task: Execute SQL query
         
-        This task is executed by the sql_specialist when the coordinator
+        This task is executed by the sql_specialist when the coordenador
         determines that a database query is needed.
         
         Inputs:
@@ -289,55 +342,24 @@ class NFeCrew:
     
     @crew
     def crew(self) -> Crew:
-        """
-        Create the NFeCrew with sequential process.
-        
-        The crew uses a sequential process where tasks are executed in order.
-        The coordinator can delegate to specialized agents as needed.
-        
-        Process Flow:
-        1. User message arrives
-        2. Main task processes the message
-        3. Agent determines if database query or conversation is needed
-        4. Appropriate specialist handles the request
-        5. Final response is returned
-        
-        Features:
-        - Sequential process with delegation capabilities
-        - Built-in memory for conversation context
-        - Verbose logging for debugging
-        - Agents can delegate to each other
-        """
-        # Prepare crew configuration
-        crew_config = {
-            "agents": [
-                self.coordinator(),
+        return Crew(
+            agents=[
+                self.coordenador(),
                 self.sql_specialist(),
                 self.conversation_specialist()
             ],
-            "tasks": [
-                # Single main task that handles the entire flow
-                self.process_user_message_task()
+            tasks=[
+                # ✅ PASSAR TODAS AS TASKS
+                self.process_user_message_task(),
+                self.execute_sql_query_task(),      # Para SQL Specialist
+                self.format_response_task(),         # Para Conversation
+                self.direct_conversation_task()     # Para Conversation
             ],
-            "process": Process.sequential,  # Sequential execution
-            "verbose": True,  # Enable detailed logging
-            "memory": False,  # DESABILITADO: Entity Memory muito lenta (10s+ por save)
-        }
-        
-        # DESABILITADO: Embedder não necessário com memory=False
-        # Add embedder configuration for semantic memory
-        # if settings.enable_semantic_search and settings.openai_api_key:
-        #     import os
-        #     os.environ["CHROMA_OPENAI_API_KEY"] = settings.openai_api_key
-        #     
-        #     crew_config["embedder"] = {
-        #         "provider": "openai",
-        #         "config": {
-        #             "model": "text-embedding-3-small"
-        #         }
-        #     }
-        
-        return Crew(**crew_config)
+            process=Process.sequential,  # Sequential execution
+            #manager_agent=self.coordenador(),
+            verbose=True,  # Enable detailed logging
+            memory=False,  # Disabled for performance (was causing 10s+ delays)
+        )
     
     def process_message(
         self,
@@ -388,12 +410,19 @@ class NFeCrew:
             "chat_history": history_str,
             "database_schema": database_schema,
             "query_results": "",  # Will be filled by sql_specialist if needed
+            # default para evitar erro de template quando tasks esperam essa variável
+            "detected_entities": {
+                "time_period": "",
+                "companies": [],
+                "products": [],
+                "metrics": []
+            }
         }
         
         # Kickoff the crew
-        # The hierarchical process will automatically:
-        # 1. Have coordinator analyze intent
-        # 2. Delegate to appropriate agent
+        # The sequential process will:
+        # 1. Have coordenador analyze intent
+        # 2. Execute query or respond directly
         # 3. Return formatted response
         result = self.crew().kickoff(inputs=inputs)
         
@@ -446,4 +475,3 @@ def create_nfe_crew() -> NFeCrew:
         NFeCrew: Initialized crew ready to process messages
     """
     return NFeCrew()
-

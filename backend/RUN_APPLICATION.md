@@ -116,7 +116,7 @@ When the application starts, it:
 
 2. **Initializes CrewAI System**
    - Creates NFeCrew with 3 agents:
-     - Coordinator (manager)
+     - coordenador (manager)
      - SQL Specialist
      - Conversation Specialist
    - Configures hierarchical process

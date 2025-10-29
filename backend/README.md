@@ -92,7 +92,7 @@ backend/
 
 O sistema utiliza 3 agentes especializados:
 
-1. **Coordinator** (Manager)
+1. **coordenador** (Manager)
    - Analisa intenções das mensagens
    - Delega tarefas aos agentes especializados
    - Coordena o fluxo de trabalho

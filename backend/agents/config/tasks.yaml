@@ -54,7 +54,7 @@ analyze_intent:
       }
     }
   
-  agent: coordinator
+  agent: coordenador
 
 execute_sql_query:
   description: >

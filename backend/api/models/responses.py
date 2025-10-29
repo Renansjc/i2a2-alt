@@ -8,7 +8,7 @@ from enum import Enum
 
 class AgentType(str, Enum):
     """Types of agents that can process requests"""
-    COORDINATOR = "coordinator"
+    coordenador = "coordenador"
     SQL_SPECIALIST = "sql_specialist"
     CONVERSATION_SPECIALIST = "conversation_specialist"
     SYSTEM = "system"

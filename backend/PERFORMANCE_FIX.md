@@ -4,7 +4,7 @@
 
 ### 1. Loop Infinito de Delegação
 
-**Sintoma**: O Coordinator delegava repetidamente para o Conversation Specialist com a mesma pergunta.
+**Sintoma**: O coordenador delegava repetidamente para o Conversation Specialist com a mesma pergunta.
 
 **Causa Raiz**:
 
@@ -82,12 +82,12 @@ crew_config = {
 
 ```python
 # ANTES
-coordinator: max_iter=25
+coordenador: max_iter=25
 sql_specialist: max_iter=15
 conversation_specialist: max_iter=10
 
 # DEPOIS
-coordinator: max_iter=5   # REDUZIDO: Evita loops infinitos
+coordenador: max_iter=5   # REDUZIDO: Evita loops infinitos
 sql_specialist: max_iter=10  # REDUZIDO: Suficiente para queries complexas
 conversation_specialist: max_iter=5  # REDUZIDO: Formatação é rápida
 ```

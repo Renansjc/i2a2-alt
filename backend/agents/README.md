@@ -8,7 +8,7 @@ NFeCrew is a CrewAI-based multi-agent system designed to process electronic invo
 
 ### Agents
 
-1. **Coordinator (Manager Agent)**
+1. **coordenador (Manager Agent)**
    - Role: Analyzes user intent and coordinates other agents
    - Capabilities: Delegation, intent analysis, workflow orchestration
    - Process: Acts as manager in hierarchical process
@@ -33,7 +33,7 @@ NFeCrew is a CrewAI-based multi-agent system designed to process electronic invo
 ```
 User Message
     ↓
-Coordinator (analyzes intent)
+coordenador (analyzes intent)
     ↓
     ├─→ SQL Specialist (if database query needed)
     │       ↓
@@ -51,11 +51,11 @@ Coordinator (analyzes intent)
 ### Hierarchical Process
 
 The system uses CrewAI's hierarchical process where:
-- The Coordinator acts as the manager
-- The Coordinator is NOT in the agents list (only SQL Specialist and Conversation Specialist)
-- The Coordinator automatically delegates tasks to appropriate agents
+- The coordenador acts as the manager
+- The coordenador is NOT in the agents list (only SQL Specialist and Conversation Specialist)
+- The coordenador automatically delegates tasks to appropriate agents
 - Agents work independently on their specialized tasks
-- Results flow back through the Coordinator to the user
+- Results flow back through the coordenador to the user
 
 ## Configuration
 
@@ -124,7 +124,7 @@ async def chat(message: str, session_id: str):
 
 ### 1. Automatic Intent Analysis
 
-The Coordinator automatically determines whether a user message requires:
+The coordenador automatically determines whether a user message requires:
 - **Database Query**: Questions about specific NF-e data (values, dates, companies, products)
 - **Conversational Response**: Greetings, explanations, general questions
 
@@ -214,7 +214,7 @@ The system handles errors at multiple levels:
 
 1. **Tool Level**: Database and schema tools return structured error messages
 2. **Agent Level**: Agents handle tool errors and provide fallback responses
-3. **Crew Level**: Coordinator manages overall error flow
+3. **Crew Level**: coordenador manages overall error flow
 4. **API Level**: FastAPI exception handlers format errors for clients
 
 ## Performance Considerations

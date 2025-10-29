@@ -115,7 +115,7 @@ class TestChatResponse:
         response = ChatResponse(
             session_id="user-123",
             message="Test",
-            agent_used="coordinator",
+            agent_used="coordenador",
             metadata=metadata
         )
         assert response.metadata == metadata
@@ -221,7 +221,7 @@ class TestEnums:
     
     def test_agent_type_values(self):
         """Test AgentType enum values"""
-        assert AgentType.COORDINATOR == "coordinator"
+        assert AgentType.coordenador == "coordenador"
         assert AgentType.SQL_SPECIALIST == "sql_specialist"
         assert AgentType.CONVERSATION_SPECIALIST == "conversation_specialist"
         assert AgentType.SYSTEM == "system"

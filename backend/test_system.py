@@ -465,7 +465,7 @@ class SystemTester:
         self.print_header("TESTE 6: Delegação Automática entre Agentes")
         
         try:
-            self.print_info("Testando delegação do Coordinator para agentes especializados...")
+            self.print_info("Testando delegação do coordenador para agentes especializados...")
             
             # Teste 1: Delegação para SQL Specialist
             self.print_subheader("6.1: Delegação para SQL Specialist")
@@ -491,7 +491,7 @@ class SystemTester:
             has_data = any(char.isdigit() for char in response_sql) and "R$" in response_sql
             
             if has_data:
-                self.print_success("✓ Coordinator delegou para SQL Specialist")
+                self.print_success("✓ coordenador delegou para SQL Specialist")
                 self.print_info("Evidência: Resposta contém dados do banco", 4)
             else:
                 self.print_error("✗ Delegação para SQL Specialist falhou")
@@ -520,7 +520,7 @@ class SystemTester:
             is_conversational = len(response_conv) > 10 and not response_conv.startswith("SELECT")
             
             if is_conversational:
-                self.print_success("✓ Coordinator delegou para Conversation Specialist")
+                self.print_success("✓ coordenador delegou para Conversation Specialist")
                 self.print_info("Evidência: Resposta é conversacional, não técnica", 4)
             else:
                 self.print_error("✗ Delegação para Conversation Specialist falhou")
@@ -546,12 +546,12 @@ class SystemTester:
             
             if success:
                 self.print_success("Sistema de delegação funcionando corretamente")
-                self.print_info("✓ Coordinator → SQL Specialist (queries)", 4)
-                self.print_info("✓ Coordinator → Conversation Specialist (conversação)", 4)
+                self.print_info("✓ coordenador → SQL Specialist (queries)", 4)
+                self.print_info("✓ coordenador → Conversation Specialist (conversação)", 4)
             else:
                 self.print_error("Sistema de delegação com problemas")
             
-            self.add_result("Delegação entre Agentes", success, "Coordinator delega corretamente")
+            self.add_result("Delegação entre Agentes", success, "coordenador delega corretamente")
             return success
             
         except Exception as e:
@@ -642,10 +642,10 @@ class SystemTester:
             for tool in sql_agent.tools:
                 self.print_info(f"- {tool.name}", 4)
             
-            # Coordinator
-            coordinator_agent = self.crew.coordinator()
-            self.print_info(f"Coordinator tem {len(coordinator_agent.tools)} tools:")
-            for tool in coordinator_agent.tools:
+            # coordenador
+            coordenador_agent = self.crew.coordenador()
+            self.print_info(f"coordenador tem {len(coordenador_agent.tools)} tools:")
+            for tool in coordenador_agent.tools:
                 self.print_info(f"- {tool.name}", 4)
             
             # Conversation Specialist (não deve ter tools de banco)

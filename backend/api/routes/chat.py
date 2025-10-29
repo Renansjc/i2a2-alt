@@ -69,11 +69,11 @@ def initialize_chat_services(crew: NFeCrew, memory: ChatMemory):
     
     The system will:
     1. Retrieve conversation history from memory
-    2. Process the message through the NFeCrew (coordinator, SQL specialist, conversation specialist)
+    2. Process the message through the NFeCrew (coordenador, SQL specialist, conversation specialist)
     3. Save the interaction to memory
     4. Return the agent's response
     
-    The coordinator agent automatically determines whether to:
+    The coordenador agent automatically determines whether to:
     - Query the database (delegates to SQL specialist)
     - Provide a conversational response (delegates to conversation specialist)
     """,
@@ -85,7 +85,7 @@ def initialize_chat_services(crew: NFeCrew, memory: ChatMemory):
                     "example": {
                         "session_id": "user-123-session",
                         "message": "Foram emitidas 42 notas fiscais este mês, totalizando R$ 125.430,50.",
-                        "agent_used": "coordinator",
+                        "agent_used": "coordenador",
                         "timestamp": "2025-10-27T10:30:00",
                         "metadata": {
                             "processing_time_ms": 1250,
@@ -160,8 +160,8 @@ async def process_chat_message(request: ChatRequest) -> ChatResponse:
             )
             
             # Determine which agent was primarily used
-            # In hierarchical process, coordinator manages everything
-            agent_used = AgentType.COORDINATOR.value
+            # In hierarchical process, coordenador manages everything
+            agent_used = AgentType.coordenador.value
             
         except Exception as e:
             # Handle OpenAI API errors

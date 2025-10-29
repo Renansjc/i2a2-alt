@@ -1,9 +1,9 @@
 # agents/config/agents.yaml
 # VERSÃO OTIMIZADA - Com priorização de contexto e anti-loops
 
-coordinator:
+coordenador:
   role: >
-    Coordenador Inteligente de Análise de Notas Fiscais
+    coordenador
   
   goal: >
     Analisar mensagens dos usuários com precisão, identificar a melhor estratégia
@@ -78,12 +78,14 @@ coordinator:
     
     ════════════════════════════════════════════════════════════════════════════
   
+  model: "gpt-4o-mini"
   verbose: true
-  allow_delegation: true
+  allow_delegation: false
+  temperature: 0.4
 
 sql_specialist:
   role: >
-    Especialista SQL em Sistemas de Notas Fiscais Eletrônicas
+    sql_specialist
   
   goal: >
     Gerar e executar consultas SQL otimizadas, seguras e precisas no banco
@@ -171,13 +173,15 @@ sql_specialist:
     • Incluem apenas as colunas necessárias
     • São auditáveis e compreensíveis
     • NÃO repetem queries já executadas
-  
+
+  model: "gpt-4o-mini"
   verbose: true
   allow_delegation: false
+  temperature: 0.1
 
 conversation_specialist:
   role: >
-    Especialista em Comunicação e Experiência do Usuário
+    comunication_specialist
   
   goal: >
     Transformar dados técnicos em respostas naturais, amigáveis e profissionais,
@@ -288,5 +292,7 @@ conversation_specialist:
     • ⭐ Diz "não tenho essa informação" sem verificar o histórico
     • ⭐ Ignora dados mencionados na conversa anterior
   
+  model: "gpt-4o-mini"
   verbose: true
   allow_delegation: false
+  temperature: 0.4

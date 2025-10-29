@@ -48,8 +48,8 @@ O script `test_system.py` é um sistema de teste manual abrangente que valida o 
 **Requirements testados:** 6.1-6.5
 
 ### 6. Delegação Automática entre Agentes
-- ✅ Coordinator → SQL Specialist (para queries)
-- ✅ Coordinator → Conversation Specialist (para conversação)
+- ✅ coordenador → SQL Specialist (para queries)
+- ✅ coordenador → Conversation Specialist (para conversação)
 - ✅ Processo hierárquico do CrewAI
 - ✅ Verificação de configuração dos agentes
 
@@ -230,7 +230,7 @@ LOG_LEVEL=DEBUG
 ### Verificar Logs do CrewAI
 
 O CrewAI gera logs detalhados durante a execução. Procure por:
-- `[Coordinator]` - Ações do coordenador
+- `[coordenador]` - Ações do coordenador
 - `[SQL Specialist]` - Queries executadas
 - `[Conversation Specialist]` - Formatação de respostas
 

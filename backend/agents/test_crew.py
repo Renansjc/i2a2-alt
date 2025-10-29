@@ -67,11 +67,11 @@ def test_agent_creation():
         assert len(conv_agent.tools) == 0, "Conversation Specialist should have no tools"
         print("✓ Conversation Specialist created successfully")
         
-        # Test Coordinator
-        coord_agent = crew.coordinator()
-        assert coord_agent is not None, "Coordinator not created"
-        assert coord_agent.allow_delegation == True, "Coordinator should allow delegation"
-        print("✓ Coordinator created successfully")
+        # Test coordenador
+        coord_agent = crew.coordenador()
+        assert coord_agent is not None, "coordenador not created"
+        assert coord_agent.allow_delegation == True, "coordenador should allow delegation"
+        print("✓ coordenador created successfully")
         
         return True
     except Exception as e:

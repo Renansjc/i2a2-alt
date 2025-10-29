@@ -12,7 +12,7 @@ Completed successfully with all sub-tasks.
    - Three agent methods with @agent decorator:
      - `sql_specialist()`: Database query specialist with 4 tools
      - `conversation_specialist()`: Natural language formatting specialist
-     - `coordinator()`: Manager agent for intent analysis and delegation
+     - `coordenador()`: Manager agent for intent analysis and delegation
    - Four task methods with @task decorator:
      - `analyze_intent_task()`: Analyze user message intent
      - `execute_sql_query_task()`: Execute SQL queries
@@ -20,7 +20,7 @@ Completed successfully with all sub-tasks.
      - `direct_conversation_task()`: Handle conversational interactions
    - `crew()` method with @crew decorator:
      - Hierarchical process configuration
-     - Coordinator as manager_agent
+     - coordenador as manager_agent
      - Memory enabled
      - Optional semantic search with embeddings
    - `process_message()` method: Main entry point for processing user messages
@@ -52,7 +52,7 @@ Completed successfully with all sub-tasks.
 - ✅ Used @agent decorator for agent methods
 - ✅ Used @task decorator for task methods
 - ✅ Used @crew decorator for crew configuration
-- ✅ Hierarchical process with coordinator as manager
+- ✅ Hierarchical process with coordenador as manager
 
 #### 2. Three Specialized Agents
 - ✅ **SQL Specialist**: 
@@ -65,22 +65,22 @@ Completed successfully with all sub-tasks.
   - Formats responses in natural language
   - Handles conversational interactions
   
-- ✅ **Coordinator (Manager)**:
+- ✅ **coordenador (Manager)**:
   - No tools (delegates to specialists)
   - Analyzes user intent
   - Delegates tasks to appropriate agents
   - Manages workflow
 
 #### 3. Four Task Definitions
-- ✅ `analyze_intent`: Coordinator determines query type
+- ✅ `analyze_intent`: coordenador determines query type
 - ✅ `execute_sql_query`: SQL Specialist executes queries
 - ✅ `format_response`: Conversation Specialist formats results
 - ✅ `direct_conversation`: Conversation Specialist handles chat
 
 #### 4. Hierarchical Process
-- ✅ Coordinator acts as manager_agent
+- ✅ coordenador acts as manager_agent
 - ✅ Manager NOT included in agents list (only SQL and Conversation specialists)
-- ✅ Automatic delegation from coordinator to specialists
+- ✅ Automatic delegation from coordenador to specialists
 - ✅ Proper task flow and coordination
 
 #### 5. Memory Integration
@@ -106,7 +106,7 @@ Completed successfully with all sub-tasks.
 
 From the task requirements:
 
-- ✅ **Requirement 2.1**: Implementar Agente Master (Coordinator) com GPT-4o-mini
+- ✅ **Requirement 2.1**: Implementar Agente Master (coordenador) com GPT-4o-mini
 - ✅ **Requirement 2.2**: Implementar Agente SQL com GPT-4o-mini
 - ✅ **Requirement 2.3**: Implementar Agente Conversa com GPT-4o-mini
 - ✅ **Requirement 3.4**: Agente Master mantém fluxo de comunicação
@@ -186,7 +186,7 @@ print(response)
 - [x] Three agent methods with @agent decorator
 - [x] Four task methods with @task decorator
 - [x] Crew method with @crew decorator and hierarchical process
-- [x] Coordinator configured as manager_agent
+- [x] coordenador configured as manager_agent
 - [x] Memory enabled in crew configuration
 - [x] process_message method implemented
 - [x] All tests passing

@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     openai_api_key: str
     openai_model: str = "gpt-4o-mini"
-    openai_temperature: float = 0.7
+    openai_temperature: float = 0.5
     openai_max_tokens: Optional[int] = None
     
     # Supabase Configuration
@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     max_chat_history: int = 4  # 2 interactions = 4 messages (user + assistant)
     memory_storage_dir: Optional[str] = None  # Custom storage dir for CrewAI memory
     enable_semantic_search: bool = True  # Enable RAG-based semantic search
-    memory_search_limit: int = 5  # Max results for semantic search
+    memory_search_limit: int = 5  # Max results for semantic 
     
     # Batch Processing Configuration
     xml_folder: str = "xml_nf"

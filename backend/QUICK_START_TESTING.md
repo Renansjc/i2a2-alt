@@ -14,7 +14,7 @@ python test_system.py
 3. ✅ **Chat Conversacional** - Saudações e perguntas gerais
 4. ✅ **Chat com Queries** - Consultas ao banco de dados
 5. ✅ **Memória de Contexto** - Histórico e perguntas de acompanhamento
-6. ✅ **Delegação de Agentes** - Coordinator → SQL/Conversation Specialists
+6. ✅ **Delegação de Agentes** - coordenador → SQL/Conversation Specialists
 7. ✅ **Tools** - SchemaInfoTool, SchemaSearchTool, SQLQueryTool
 
 ## Pré-requisitos Mínimos

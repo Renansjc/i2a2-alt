@@ -138,7 +138,7 @@ async def lifespan(app: FastAPI):
         nfe_crew = NFeCrew()
         logger.info(
             "nfe_crew_initialized",
-            agents=["coordinator", "sql_specialist", "conversation_specialist"]
+            agents=["coordenador", "sql_specialist", "conversation_specialist"]
         )
         
         # Initialize ChatMemory
@@ -221,11 +221,11 @@ app = FastAPI(
     Features:
     - **Chat Interface**: Natural language queries about NF-e data
     - **Batch Processing**: Import multiple XML files in batch
-    - **Multi-Agent System**: Coordinator, SQL Specialist, and Conversation Specialist
+    - **Multi-Agent System**: coordenador, SQL Specialist, and Conversation Specialist
     - **Memory System**: RAG-based conversation memory with semantic search
     
     The system uses three specialized agents:
-    - **Coordinator**: Analyzes intent and delegates tasks
+    - **coordenador**: Analyzes intent and delegates tasks
     - **SQL Specialist**: Generates and executes database queries
     - **Conversation Specialist**: Formats responses in natural language
     """,
@@ -403,7 +403,7 @@ async def health_check():
                         "services": {
                             "crewai": {
                                 "initialized": True,
-                                "agents": ["coordinator", "sql_specialist", "conversation_specialist"],
+                                "agents": ["coordenador", "sql_specialist", "conversation_specialist"],
                                 "model": "gpt-4o-mini"
                             },
                             "memory": {
@@ -444,7 +444,7 @@ async def detailed_health_check():
         health_info["services"]["crewai"] = {
             "initialized": True,
             "agents": [
-                "coordinator (manager)",
+                "coordenador",
                 "sql_specialist",
                 "conversation_specialist"
             ],
