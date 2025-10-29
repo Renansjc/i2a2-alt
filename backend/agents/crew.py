@@ -119,9 +119,9 @@ class NFeCrew:
             goal=config['goal'],
             backstory=config['backstory'],
             tools=[
-                self.sql_tool,  # Primary: Direct SQL queries
+                self.schema_search_tool,
                 self.schema_tool,
-                self.schema_search_tool
+                self.sql_tool  # Primary: Direct SQL queries
             ],
             verbose=config.get('verbose', True),
             allow_delegation=config.get('allow_delegation', False),

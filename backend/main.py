@@ -138,7 +138,7 @@ async def lifespan(app: FastAPI):
         nfe_crew = NFeCrew()
         logger.info(
             "nfe_crew_initialized",
-            agents=["coordenador", "sql_specialist", "conversation_specialist"]
+            agents=["coordenador", "sql_specialist", "conversation_specialist", "fiscal_specialist"]
         )
         
         # Initialize ChatMemory
@@ -455,6 +455,7 @@ async def detailed_health_check():
                 "DatabaseQueryTool",
                 "DatabaseJoinQueryTool",
                 "SchemaInfoTool",
+                "SQLQueryTool",
                 "SchemaSearchTool"
             ]
         }

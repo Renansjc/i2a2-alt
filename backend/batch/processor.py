@@ -84,8 +84,12 @@ class BatchProcessor:
                 details={"folder_path": folder_path}
             )
         
-        # Find all XML files
-        xml_files = list(folder.glob("*.xml")) + list(folder.glob("*.XML"))
+        # Find all XML files (case-insensitive, avoiding duplicates)
+        xml_files_lower = list(folder.glob("*.xml"))
+        xml_files_upper = list(folder.glob("*.XML"))
+        
+        # Remove duplicates by converting to set of resolved paths
+        xml_files = list(set(xml_files_lower + xml_files_upper))
         
         if not xml_files:
             raise BatchProcessingException(

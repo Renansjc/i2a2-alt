@@ -153,9 +153,6 @@
       </Transition>
       
       <!-- Notification Badge -->
-      <span v-if="unreadCount > 0 && !isOpen" class="absolute -top-1 -right-1 badge badge-error badge-sm">
-        {{ unreadCount }}
-      </span>
     </button>
   </div>
 </template>
