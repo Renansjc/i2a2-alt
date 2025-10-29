@@ -125,7 +125,7 @@ class NFeCrew:
             ],
             verbose=config.get('verbose', True),
             allow_delegation=config.get('allow_delegation', False),
-            max_iter=2,
+            max_iter=4,
             memory=False,
             llm=self._create_llm('sql_specialist')  # ✅ LLM from YAML
         )
@@ -158,7 +158,7 @@ class NFeCrew:
             tools=[],  # No tools - only formats responses
             verbose=config.get('verbose', True),
             allow_delegation=config.get('allow_delegation', False),
-            max_iter=2,
+            max_iter=4,
             memory=False,
             llm=self._create_llm('conversation_specialist')  # ✅ LLM from YAML
         )
@@ -201,9 +201,9 @@ class NFeCrew:
             goal=config['goal'],
             backstory=config['backstory'],
             verbose=config.get('verbose', True),
-            allow_delegation=True,
-            max_iter=2,
-            memory=True,
+            allow_delegation=False,
+            max_iter=4,
+            memory=False,
             llm=self._create_llm('coordenador')  # ✅ LLM from YAML
         )
     
@@ -358,7 +358,7 @@ class NFeCrew:
             process=Process.sequential,  # Sequential execution
             #manager_agent=self.coordenador(),
             verbose=True,  # Enable detailed logging
-            memory=True,  # Disabled for performance (was causing 10s+ delays)
+            memory=False,  # Disabled for performance (was causing 10s+ delays)
         )
     
     def process_message(
