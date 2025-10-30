@@ -51,7 +51,7 @@ O sistema é composto por três camadas principais:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    FRONTEND (Nuxt 3)                    │
+│                    FRONTEND (Nuxt 4)                    │
 │  Dashboard • Chat Interface • Upload • Relatórios       │
 └────────────────────┬────────────────────────────────────┘
                      │ REST API
