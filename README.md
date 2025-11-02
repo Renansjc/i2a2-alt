@@ -596,7 +596,7 @@ Contribuições são bem-vindas! Para contribuir:
 
 ## 📄 Licença
 
-Este projeto está sob a licença especificada no arquivo LICENSE.
+Este projeto está sob a licença MIT.
 
 ## 📧 Suporte
 
